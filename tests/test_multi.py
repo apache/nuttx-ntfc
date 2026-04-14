@@ -394,10 +394,14 @@ def test_run_all_pass(tmp_path):
     )
     runner = _make_runner(mc)
 
+    mock_log_mgr = MagicMock()
+    mock_log_mgr.new_session_dir.return_value = tmp
+
     with (
         patch.object(runner, "_phase_build") as mock_build,
         patch.object(runner, "_phase_test") as mock_test,
         patch.object(runner, "_phase_report"),
+        patch("ntfc.multi.LogManager", return_value=mock_log_mgr),
     ):
         mock_build.return_value = {"s1": {}, "s2": {}}
         mock_test.return_value = [
@@ -417,10 +421,14 @@ def test_run_session_fails(tmp_path):
     )
     runner = _make_runner(mc)
 
+    mock_log_mgr = MagicMock()
+    mock_log_mgr.new_session_dir.return_value = tmp
+
     with (
         patch.object(runner, "_phase_build") as mock_build,
         patch.object(runner, "_phase_test") as mock_test,
         patch.object(runner, "_phase_report"),
+        patch("ntfc.multi.LogManager", return_value=mock_log_mgr),
     ):
         mock_build.return_value = {"s1": {}}
         mock_test.return_value = [
@@ -751,6 +759,7 @@ def test_run_session_calls_mypytest(tmp_path):
         ],
     )
     runner = MultiSessionRunner(mc, rebuild=False)
+    runner._session_dir = tmp
 
     mock_pt = MagicMock()
     mock_pt.runner.return_value = 0
@@ -763,6 +772,11 @@ def test_run_session_calls_mypytest(tmp_path):
     assert result.result_dir == "/tmp/fake_result"
     mock_pt.runner.assert_called_once()
 
+    # Verify result_dir was passed to runner
+    call_args = mock_pt.runner.call_args
+    result_dict = call_args[0][1]
+    assert result_dict["result_dir"] == os.path.join(tmp, "s1")
+
 
 def test_run_session_sets_fail_event(tmp_path):
     tmp = str(tmp_path)
@@ -773,6 +787,7 @@ def test_run_session_sets_fail_event(tmp_path):
         sessions=[SessionConfig(name="s1", confpath=confpath, testpath=tmp)],
     )
     runner = MultiSessionRunner(mc, rebuild=False)
+    runner._session_dir = tmp
 
     fail_event = threading.Event()
 
@@ -847,14 +862,11 @@ def test_phase_report(tmp_path):
         sessions=[SessionConfig(name="s1", confpath=confpath, testpath=tmp)],
     )
     runner = MultiSessionRunner(mc, rebuild=False)
+    runner._session_dir = tmp
 
     results = [SessionResult("s1", 0, tmp)]
 
-    mock_log_mgr = MagicMock()
-    mock_log_mgr.new_session_dir.return_value = tmp
-
     with (
-        patch("ntfc.multi.LogManager", return_value=mock_log_mgr),
         patch("ntfc.multi.Reporter") as mock_rep_cls,
         patch.object(
             MultiSessionRunner, "_merge_session_reports"

@@ -338,10 +338,15 @@ class MyPytest:
             opt.append(testpath)
 
         if not nologs:  # pragma: no cover
-            # create result directory via LogManager
-            log_manager = LogManager(result.get("logcfg"))
-            log_manager.cleanup()
-            pytest.result_dir = log_manager.new_session_dir()
+            if "result_dir" in result:
+                # Use pre-created result directory (multi-session mode)
+                pytest.result_dir = result["result_dir"]
+                os.makedirs(pytest.result_dir, exist_ok=True)
+            else:
+                # create result directory via LogManager
+                log_manager = LogManager(result.get("logcfg"))
+                log_manager.cleanup()
+                pytest.result_dir = log_manager.new_session_dir()
             self.result_dir = pytest.result_dir
             self._write_session_config(pytest.result_dir)
 

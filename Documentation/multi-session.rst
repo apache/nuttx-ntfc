@@ -101,8 +101,9 @@ fails the entire run is aborted immediately.
 Phase 2: Test
 -------------
 
-After all builds succeed, test sessions are executed.  Each session gets its
-own sub-directory under a single timestamped result directory
+After all builds succeed, a single timestamped result directory is created
+(e.g. ``result/2026-04-14_18-30-00/``).  Each session writes its results
+into a sub-directory named after the session
 (``result/<timestamp>/<session-name>/``).
 
 In **sequential mode** (default) sessions run in manifest order.  With
@@ -121,12 +122,30 @@ Phase 3: Report
 ---------------
 
 Individual session JUnit XML reports are merged into a single
-``report.xml`` at the master result directory.  Testsuite names and
+``report.xml`` in the shared result directory.  Testsuite names and
 testcase classnames are prefixed with the session name
 (``<session>::<original>``), so results from different sessions never
 collide.
 
 A unified HTML summary is generated from the merged report.
+
+The final directory layout looks like this::
+
+  result/<timestamp>/
+      report.xml                           # merged JUnit XML
+      report/
+          result_summary.txt               # aggregated summary
+          result_summary.html
+      session-a/
+          report.xml                       # session-a JUnit XML
+          report.html
+          session.config.txt
+          ...
+      session-b/
+          report.xml
+          report.html
+          session.config.txt
+          ...
 
 Resource Tags
 =============

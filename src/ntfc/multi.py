@@ -263,10 +263,15 @@ class MultiSessionRunner:
         if built_configs is None:
             return 1
 
+        # Create shared session directory for all sessions
+        log_manager = LogManager(self._logcfg)
+        log_manager.cleanup()
+        self._session_dir = log_manager.new_session_dir()
+
         # Phase 2: Run all test sessions
         results = self._phase_test(built_configs)
 
-        # Phase 3: Merge reports
+        # Phase 3: Merge reports into the shared session directory
         self._phase_report(results)
 
         # Print final summary
@@ -519,7 +524,11 @@ class MultiSessionRunner:
         pt = MyPytest(conf, exitonfail, self._verbose, modules=modules)
 
         logger.info(f"[Multi] Running session '{session.name}'")
-        result: Dict[str, Any] = {"logcfg": self._logcfg}
+        session_result_dir = os.path.join(self._session_dir, session.name)
+        result: Dict[str, Any] = {
+            "logcfg": self._logcfg,
+            "result_dir": session_result_dir,
+        }
         exit_code = pt.runner(session.testpath, result)
 
         # read result_dir from the instance, not global pytest module
@@ -621,11 +630,8 @@ class MultiSessionRunner:
         """
         logger.info("[Multi] Phase 3: Merging reports")
 
-        log_manager = LogManager(self._logcfg)
-        merge_dir = log_manager.new_session_dir()
-
         reporter = Reporter()
-        self._merge_session_reports(merge_dir, results, reporter)
+        self._merge_session_reports(self._session_dir, results, reporter)
 
     @staticmethod
     def _copy_testcase(
