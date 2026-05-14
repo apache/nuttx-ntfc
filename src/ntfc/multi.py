@@ -466,6 +466,7 @@ class MultiSessionRunner:
             if builder.need_build():
                 try:
                     builder.build_all()
+                    builder.flash_all()
                 except Exception as e:
                     logger.error(
                         f"[Multi] Build failed for session "
