@@ -150,8 +150,33 @@ class ProductConfig:
 
     @property
     def core_names(self) -> list[str]:
-        """Get list of core names."""
+        """Get list of all configured core names."""
         return list(self._cores.keys())
+
+    @property
+    def active_core_indices(self) -> list[int]:
+        """Return configured core indices that participate in tests."""
+        return [
+            idx
+            for idx in sorted(self._core_index_to_name)
+            if not self.cfg_core(idx).flash_only
+        ]
+
+    @property
+    def active_core_names(self) -> list[str]:
+        """Return core names that participate in tests."""
+        return [self._get_core_name(idx) for idx in self.active_core_indices]
+
+    @property
+    def active_cores_num(self) -> int:
+        """Get number of cores that participate in tests."""
+        return len(self.active_core_indices)
+
+    @property
+    def primary_test_core_index(self) -> int:
+        """Return the default core index used for requirement checks."""
+        active = self.active_core_indices
+        return active[0] if active else 0
 
     def cfg_core(self, cpu: int) -> CoreConfig:
         """Get core configuration by index.

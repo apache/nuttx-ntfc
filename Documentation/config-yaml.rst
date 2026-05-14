@@ -82,6 +82,42 @@ Use AMP when:
 - Cores run independently
 - Testing different firmware images on each core
 
+**Build/flash-only auxiliary cores**
+
+A core can be marked as build/flash-only with ``flash_only: true``. NTFC will
+still build and flash that core, but it will not:
+
+- wait for that core to boot,
+- validate ``ntfc.yaml`` Kconfig requirements on it,
+- collect logs from it,
+- send test commands to it, or
+- include it in reboot/heartbeat/test orchestration.
+
+This is useful when one tested core depends on companion firmware running on
+another core, but only the tested core should participate in NTFC runtime
+checks.
+
+.. code-block:: yaml
+
+   product:
+     name: "product-name"
+     platform: "amp"
+     cores:
+       core0:
+         name: 'cpuapp'
+         device: 'serial'
+         exec_path: '/dev/ttyACM0'
+         exec_args: '115200,n,8,1'
+         # core0 is the tested core
+
+       core1:
+         name: 'cpunet'
+         device: 'serial'
+         exec_path: '/dev/ttyACM1'
+         exec_args: '115200,n,8,1'
+         flash_only: true
+         # core1 is built/flashed only
+
 **SMP (Symmetric Multi-Processing)**
 
 In SMP mode, all cores share the same device instance, coordinated by
@@ -392,6 +428,10 @@ These fields are parsed by :class:`ntfc.coreconfig.CoreConfig`.
      - System command for hardware reboot of the device (serial only)
    * - ``poweroff``
      - System command for hardware poweroff of the device (serial only)
+   * - ``flash_only``
+     - Build/flash this core but exclude it from runtime test orchestration:
+       no boot checks, no requirement validation, no logs, and no command
+       execution against it
    * - ``dcmake``
      - Defines passed to CMake build (YAML mapping syntax, e.g.
        ``FEATURE_X: ON``)

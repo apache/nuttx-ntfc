@@ -191,6 +191,28 @@ def test_product_config_core_names_property():
     assert p.core_names == ["main", "cpu1", "cpu2"]
 
 
+def test_product_config_active_cores():
+    conf = {
+        "name": "product",
+        "cores": {
+            "core0": {"name": "cpuapp", "device": "sim"},
+            "core1": {
+                "name": "cpunet",
+                "device": "sim",
+                "flash_only": True,
+            },
+            "core2": {"name": "sensor", "device": "sim"},
+        },
+    }
+
+    p = ProductConfig(conf)
+    assert p.core_names == ["cpuapp", "cpunet", "sensor"]
+    assert p.active_core_indices == [0, 2]
+    assert p.active_core_names == ["cpuapp", "sensor"]
+    assert p.active_cores_num == 2
+    assert p.primary_test_core_index == 0
+
+
 def test_product_config_cfg_core():
     """Test cfg_core and cfg_core_by_name methods."""
 

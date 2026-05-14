@@ -140,8 +140,8 @@ class MyPytest:
         for prod_config in config.product:
             p = Product(prod_config)
 
-            # check config requirements
-            for core in range(len(p.conf.cores)):
+            # check config requirements only on cores that participate in tests
+            for core in p.conf.active_core_indices:
                 ret = self._kv_validate(p, core)
                 if ret[0] is False:  # pragma: no cover
                     raise IOError(f"Missing kconfig dependency: {ret[1]}")

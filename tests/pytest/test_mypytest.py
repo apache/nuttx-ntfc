@@ -23,6 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from ntfc.envconfig import EnvConfig
 from ntfc.pytest.mypytest import MyPytest
 
 
@@ -172,6 +173,43 @@ def test_runner_run_device_starts_when_not_alive(
         p = MyPytest(config_dummy)
         path = "./tests/resources/tests_exitcode/test_success.py"
         assert p.runner(path, {}) == 0
+
+
+def test_create_products_skips_requirements_for_flash_only_core(
+    device_dummy, monkeypatch
+):
+    import pytest as pytest_module
+
+    config = {
+        "config": {},
+        "product": {
+            "name": "product",
+            "cores": {
+                "core0": {
+                    "name": "cpuapp",
+                    "device": "sim",
+                    "conf_path": "./tests/resources/nuttx/sim/kv_config",
+                    "elf_path": "./tests/resources/nuttx/sim/nuttx",
+                },
+                "core1": {
+                    "name": "cpunet",
+                    "device": "sim",
+                    "flash_only": True,
+                },
+            },
+        },
+    }
+
+    monkeypatch.setattr(
+        pytest_module,
+        "ntfcyaml",
+        {"requirements": [["CONFIG_HOST_LINUX", True]]},
+        raising=False,
+    )
+    with patch("ntfc.cores.get_device", return_value=device_dummy):
+        products = MyPytest(config)._create_products(EnvConfig(config))
+    assert len(products) == 1
+    assert products[0].cores == ["cpuapp"]
 
 
 def test_device_stop_calls_stop(config_dummy, device_dummy):
