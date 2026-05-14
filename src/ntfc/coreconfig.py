@@ -134,6 +134,16 @@ class CoreConfig:
         """Return core poweroff command."""
         return self._config.get("poweroff", "")
 
+    @property
+    def flash_only(self) -> bool:
+        """Return whether this core is build/flash-only.
+
+        Flash-only cores are still built/flashed by NTFC, but are skipped for
+        runtime test orchestration: no boot checks, no log collection, no test
+        requirements validation, and no command execution against them.
+        """
+        return bool(self._config.get("flash_only", False))
+
     def kv_check(self, cfg: str) -> Any:
         """Check Kconfig option and return its value.
 

@@ -91,6 +91,12 @@ def test_load_core_config_value_types(tmp_path):
     assert p.kv_check("CONFIG_UNQUOTED") == "plain_text"
 
 
+def test_core_config_flash_only_property():
+    conf = {"name": "test", "flash_only": True}
+    assert CoreConfig(conf).flash_only is True
+    assert CoreConfig({"name": "test"}).flash_only is False
+
+
 def test_core_config_prompt():
     # Test with explicit prompt in YAML config
     conf = {

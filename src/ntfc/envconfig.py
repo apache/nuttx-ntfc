@@ -117,24 +117,32 @@ class EnvConfig:
         return {**default_config, **recovery_cfg}
 
     # dep_config
-    def kv_check(self, cfg: str, product: int = 0, core: int | str = 0) -> Any:
+    def kv_check(
+        self, cfg: str, product: int = 0, core: int | str | None = None
+    ) -> Any:
         """Check Kconfig option.
 
         :param cfg: Kconfig option name
         :param product: Product index (default: 0)
-        :param core: Core index (0, 1, 2) or name ('main', 'cpu1', 'cpu2')
+        :param core: Core index/name to check. When omitted, uses the primary
+            non-``flash_only`` core for the selected product.
         """
+        if core is None:
+            core = self._products[product].primary_test_core_index
         return self._products[product].kv_check(cfg, core)
 
     def cmd_check(
-        self, cmd: str, product: int = 0, core: int | str = 0
+        self, cmd: str, product: int = 0, core: int | str | None = None
     ) -> bool:
         """Check if command is available in binary.
 
         :param cmd: Command name or pattern (e.g., 'free' or 'free|ps')
         :param product: Product index (default: 0)
-        :param core: Core index (0, 1, 2) or name ('main', 'cpu1', 'cpu2')
+        :param core: Core index/name to check. When omitted, uses the primary
+            non-``flash_only`` core for the selected product.
         """
+        if core is None:
+            core = self._products[product].primary_test_core_index
         return self._products[product].cmd_check(cmd, core)
 
     def extra_check(

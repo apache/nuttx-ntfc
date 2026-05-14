@@ -98,6 +98,57 @@ def test_cores_init(envconfig_dummy):
             assert c.force_panic() is True
 
 
+def test_cores_skip_flash_only_amp_core():
+    conf = {
+        "name": "product",
+        "platform": "amp",
+        "cores": {
+            "core0": {"name": "cpuapp", "device": "sim"},
+            "core1": {
+                "name": "cpunet",
+                "device": "sim",
+                "flash_only": True,
+            },
+        },
+    }
+
+    from ntfc.productconfig import ProductConfig
+
+    with (
+        patch("ntfc.cores.get_device") as mock_get_device,
+        patch("ntfc.cores.ProductCore") as mock_product_core,
+    ):
+        core = mock_product_core.return_value
+        core.name = "cpuapp"
+        mock_get_device.return_value = object()
+        c = CoresHandler(ProductConfig(conf))
+        c._cores[0] = core
+        assert c.cores == ["cpuapp"]
+        assert mock_get_device.call_count == 1
+
+
+def test_cores_smp_all_flash_only():
+    """SMP product with only flash_only cores creates no core instances."""
+    conf = {
+        "name": "product",
+        "platform": "smp",
+        "cores": {
+            "core0": {
+                "name": "cpuapp",
+                "device": "sim",
+                "flash_only": True,
+            },
+        },
+    }
+
+    from ntfc.productconfig import ProductConfig
+
+    with patch("ntfc.cores.get_device") as mock_get_device:
+        c = CoresHandler(ProductConfig(conf))
+        assert c.cores == []
+        mock_get_device.assert_not_called()
+
+
 def test_cores_smp_mode(envconfig_smp_dummy):
     """Test CoresHandler in SMP mode."""
 

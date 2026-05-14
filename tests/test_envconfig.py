@@ -140,6 +140,20 @@ def test_envconfig_extra_check(envconfig_dummy):
     assert envconfig_dummy.extra_check("") is False
 
 
+def test_envconfig_cmd_check_defaults_to_primary_test_core():
+    env = EnvConfig({"config": {}, "product": {"name": "p0", "cores": {}}})
+    product = MagicMock()
+    product.primary_test_core_index = 2
+    product.cmd_check.return_value = True
+    product.kv_check.return_value = True
+    env._products = [product]
+
+    assert env.cmd_check("hello_main") is True
+    assert env.kv_check("CONFIG_SYSTEM_NSH") is True
+    product.cmd_check.assert_called_once_with("hello_main", 2)
+    product.kv_check.assert_called_once_with("CONFIG_SYSTEM_NSH", 2)
+
+
 def test_envconfig_cmd_check_respects_product_index():
     """cmd_check should use the requested product index."""
     env = EnvConfig({"config": {}, "product": {"name": "p0", "cores": {}}})
@@ -147,11 +161,16 @@ def test_envconfig_cmd_check_respects_product_index():
     p1 = MagicMock()
     p0.cmd_check.return_value = False
     p1.cmd_check.return_value = True
+    p1.kv_check.return_value = True
     env._products = [p0, p1]
 
     assert env.cmd_check("hello_main", product=1, core=0) is True
     p1.cmd_check.assert_called_once_with("hello_main", 0)
     p0.cmd_check.assert_not_called()
+
+    assert env.kv_check("CONFIG_SYSTEM_NSH", product=1, core=0) is True
+    p1.kv_check.assert_called_once_with("CONFIG_SYSTEM_NSH", 0)
+    p0.kv_check.assert_not_called()
 
 
 def test_envconfig_recovery_defaults():
