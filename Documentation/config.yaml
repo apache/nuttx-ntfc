@@ -24,6 +24,41 @@ product:                          # many products can be supported in tests (pro
   name: "product"                 # product name
   platform: "amp"                 # Platform type: "amp" (default) or "smp"
   ignored_cores: ["dsp"]          # (optional) core names skipped in get_core_info. Defaults to ["dsp"]
+
+  debug:                          # (optional) advanced debug features, see Documentation/debug/index.rst
+    coredump:                     # coredump collection on test failure
+      enable: false               # enable coredump collection (default: false)
+      type: 'auto'                # backend: 'auto' (default), 'gdb', 'fastboot',
+                                  #   'ymodem', 'local_file' or 'syslog'
+      limit: 5                    # max coredumps collected per session (default: 5)
+    gdb:                          # GDB-based debugging
+      enable: false               # enable the GDB backend (default: false)
+      force_panic: false          # force a panic on the device before coredump (default: false)
+      target: ''                  # 'target remote' address, eg 'localhost:1234' or '/tmp/gdb.socket'
+      gdb_path: 'gdb'             # GDB executable, eg 'gdb-multiarch' for cross targets
+      plugin: false               # load the NTFC in-GDB Python plugin (default: false)
+      setup_cmds: []              # raw GDB commands sent after attach, eg
+                                  #   - 'ntfcautobp bp up_assert ntfcautogcore -d $RESULT_DIR gcore'
+      gcore_cmd: 'gcore'          # command used to write corefiles
+      nx_plugin: ''               # path to NuttX pynuttx gdbinit.py
+      osabi: ''                   # 'set osabi <value>' sent when non-empty
+      auto_breakpoints: false     # plant standard crash/poweroff breakpoints
+      mmleak: false               # add ntfcmmleak to the poweroff breakpoint
+      attach: false               # PID-attach to sim process (excludes target)
+      use_sudo: false             # prefix attach-mode GDB with sudo
+    local_file:                   # host-filesystem coredump backend
+      core_dir: ''                # watched host directory (required to enable)
+      pattern: '*.core'           # corefile glob pattern
+    syslog:                       # serial syslog coredump backend
+      enable: false               # decode base64+lzf coredump from output
+    fastboot:                     # fastboot coredump transport
+      dev_sn: ''                  # fastboot device serial number (required to enable this backend)
+      mem_addr: '0x40000000'      # memory dump start address
+      mem_size: '0x08000000'      # memory dump size
+    ymodem:                       # ymodem coredump transport
+      serial_port: ''             # host serial port, eg '/dev/ttyUSB0' (required to enable)
+      baud_rate: 921600           # serial baud rate for the transfer
+      sbrb_path: ''               # path to the sbrb.py ymodem receiver script (required to enable)
                                   # amp: Each core has its own device instance
                                   # smp: All cores share the same device, automatic core switching
   cores:                          # Cores configuration

@@ -234,6 +234,86 @@ def test_device_stop_calls_stop(config_dummy, device_dummy):
                 core._device.stop.assert_called_once()
 
 
+def test_runner_wires_debug_plugins(config_dummy, device_dummy, monkeypatch):
+    """runner() opens/closes the debug setup and passes its plugins."""
+    with patch("ntfc.cores.get_device", return_value=device_dummy):
+        p = MyPytest(config_dummy)
+
+        debug_plugin = MagicMock()
+        debug = MagicMock()
+        debug.plugins = [debug_plugin]
+
+        run_plugins = []
+
+        def _run(_opt, plugins):
+            run_plugins.extend(plugins)
+            return 0
+
+        monkeypatch.setattr(p, "_init_pytest", lambda _path: None)
+        monkeypatch.setattr(p, "_device_start", lambda: None)
+        monkeypatch.setattr(p, "_device_stop", lambda: None)
+        monkeypatch.setattr(p, "_run", _run)
+        monkeypatch.setattr(
+            "ntfc.pytest.mypytest.get_debug_setup",
+            lambda _products: debug,
+        )
+
+        import pytest as _pytest
+
+        monkeypatch.setattr(_pytest, "products", [], raising=False)
+
+        assert p.runner("tests", {}, nologs=True) == 0
+
+        assert debug_plugin in run_plugins
+        debug.start.assert_called_once_with("")
+        debug.stop.assert_called_once()
+        assert p._ptconfig._restart_gdb is debug.restart_all_controllers
+
+
+def test_runner_stops_devices_when_debug_start_raises(
+    config_dummy, device_dummy, monkeypatch
+):
+    """A debug setup failure must not leave devices running."""
+    with patch("ntfc.cores.get_device", return_value=device_dummy):
+        p = MyPytest(config_dummy)
+
+        debug = MagicMock()
+        debug.start.side_effect = RuntimeError("gdb exploded")
+
+        stop_mock = MagicMock()
+        monkeypatch.setattr(p, "_init_pytest", lambda _path: None)
+        monkeypatch.setattr(p, "_device_start", lambda: None)
+        monkeypatch.setattr(p, "_device_stop", stop_mock)
+        monkeypatch.setattr(
+            "ntfc.pytest.mypytest.get_debug_setup",
+            lambda _products: debug,
+        )
+
+        import pytest as _pytest
+
+        monkeypatch.setattr(_pytest, "products", [], raising=False)
+
+        with pytest.raises(RuntimeError, match="gdb exploded"):
+            p.runner("tests", {}, nologs=True)
+
+        debug.stop.assert_called_once()
+        stop_mock.assert_called_once()
+
+
+def test_runner_no_debug_plugins_by_default(config_dummy, device_dummy):
+    """Products without a debug section produce no debug plugins."""
+    with patch("ntfc.cores.get_device", return_value=device_dummy):
+        p = MyPytest(config_dummy)
+        path = "./tests/resources/tests_exitcode/test_success.py"
+        assert p.runner(path, {}, nologs=True) == 0
+
+        import pytest as _pytest
+
+        from ntfc.debug.getdebug import get_debug_setup
+
+        assert get_debug_setup(_pytest.products).plugins == []
+
+
 def test_write_session_config_file(config_dummy, tmp_path):
     p = MyPytest(config_dummy)
 

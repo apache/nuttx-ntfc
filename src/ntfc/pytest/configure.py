@@ -22,7 +22,7 @@
 
 import os
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import pytest
 
@@ -48,6 +48,21 @@ class PytestConfigPlugin:
         self._config = config
         self._verbose = verbose
         self._recovery_failed = False
+        self._restart_gdb: Optional[Callable[[], None]] = None
+
+    def set_restart_gdb(self, callback: "Callable[[], None]") -> None:
+        """Register a callback fired after a successful device reboot.
+
+        A reboot restarts every product's device process, so any GDB
+        session already attached to one is left talking to a process
+        that no longer exists. Set by
+        :meth:`~ntfc.pytest.mypytest.MyPytest.runner` once the debug
+        setup (and its GDB controllers, if any) exists.
+
+        :param callback: Callable invoked with no arguments after a
+            successful reboot.
+        """
+        self._restart_gdb = callback
 
     def _device_reboot(self) -> None:  # pragma: no cover
         """Reboot the device with retry and exponential back-off.
@@ -76,6 +91,8 @@ class PytestConfigPlugin:
                 success = pytest.product.reboot()
                 if success:
                     logger.info("Device recovered on attempt %d", attempt)
+                    if self._restart_gdb is not None:
+                        self._restart_gdb()
                     return
                 logger.warning("Reboot attempt %d returned failure", attempt)
             except Exception as exc:
@@ -236,6 +253,13 @@ class PytestConfigPlugin:
         self, item: pytest.Item, call: pytest.CallInfo[None]
     ) -> Any:
         """Create a TestReport for each of the runtest phases.
+
+        On a crash this hook reboots the device via ``_device_reboot``.
+        ``ntfc.pytest.coredump_plugin.CoredumpPlugin`` is marked
+        ``hookimpl(hookwrapper=True, trylast=True)`` specifically so its
+        post-yield coredump collection resumes before this hook's
+        post-yield reboot; if that plugin's hook priority ever changes,
+        collection can race the reboot and lose the coredump.
 
         :param item:
         :param call: the CallInfo for the phase

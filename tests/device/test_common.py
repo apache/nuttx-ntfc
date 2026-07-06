@@ -288,4 +288,69 @@ def test_device_common_log_helpers():
             assert "buffered-cmd" in output
 
 
+def test_pid_default_none():
+
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        config = mockdevice.return_value
+        dev = DeviceMock(config)
+
+        assert dev.pid is None
+
+
+def test_output_tail_accumulates():
+
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        config = mockdevice.return_value
+        dev = DeviceMock(config)
+
+        dev._output_tail_append(b"hello ")
+        dev._output_tail_append(b"world")
+        assert dev.output_tail() == "hello world"
+
+
+def test_output_tail_capped():
+
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        config = mockdevice.return_value
+        dev = DeviceMock(config)
+
+        dev._output_tail_append(b"x" * (4 * 1024 * 1024))
+        dev._output_tail_append(b"tail-marker")
+        tail = dev.output_tail()
+        assert len(tail) <= 4 * 1024 * 1024
+        assert tail.endswith("tail-marker")
+
+
+def test_reset_output_tail_clears_buffer():
+
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        config = mockdevice.return_value
+        dev = DeviceMock(config)
+
+        dev._output_tail_append(b"stale crash markers")
+        dev.reset_output_tail()
+
+        assert dev.output_tail() == ""
+        dev._output_tail_append(b"fresh")
+        assert dev.output_tail() == "fresh"
+
+
+def test_read_all_appends_chunks_to_output_tail(monkeypatch):
+
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        config = mockdevice.return_value
+        dev = DeviceMock(config)
+
+        chunks = [b"AAA", b"BBB"]
+
+        def fake_read(_=0):
+            return chunks.pop(0) if chunks else b""
+
+        monkeypatch.setattr(dev, "_read", fake_read)
+        dev._read_all(timeout=0.05)
+
+        # per-chunk append, not cumulative re-append of growing output
+        assert dev.output_tail() == "AAABBB"
+
+
 # TODO: missing tests

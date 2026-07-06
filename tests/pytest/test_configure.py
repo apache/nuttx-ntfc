@@ -32,6 +32,16 @@ def test_test_pytestconfigureplugin_init(config_dummy):
     _ = PytestConfigPlugin(config_dummy)
 
 
+def test_set_restart_gdb_stores_callback(config_dummy):
+    plugin = PytestConfigPlugin(config_dummy)
+    assert plugin._restart_gdb is None
+
+    callback = MagicMock()
+    plugin.set_restart_gdb(callback)
+
+    assert plugin._restart_gdb is callback
+
+
 def test_pytest_configure_log_file_uses_result_dir(
     config_dummy, monkeypatch, tmp_path
 ):

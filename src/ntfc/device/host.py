@@ -53,6 +53,11 @@ class DeviceHost(DeviceCommon):
         self._cwd = None
         self._cmd: Optional[List[str]] = None
 
+    @property
+    def pid(self) -> Optional[int]:
+        """Return the spawned child PID, or ``None`` before start."""
+        return self._child.pid if self._child else None
+
     def _dev_is_health_priv(self) -> bool:
         """Check if the host device is OK."""
         if not self._child:

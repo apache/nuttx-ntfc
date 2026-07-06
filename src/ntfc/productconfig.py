@@ -23,6 +23,7 @@
 from typing import Any, Dict, List
 
 from ntfc.coreconfig import CoreConfig
+from ntfc.debug.config import DebugConfig
 from ntfc.log.logger import logger
 
 
@@ -40,6 +41,9 @@ class ProductConfig:
         self._cores: Dict[str, CoreConfig] = {}
         self._core_index_to_name: Dict[int, str] = {}
         self._init_cores()
+
+        # Optional debug features configuration
+        self._debug = DebugConfig(self._config.get("debug", {}))
 
     def _init_cores(self) -> None:
         """Initialize cores dictionary from configuration."""
@@ -213,6 +217,11 @@ class ProductConfig:
     def is_amp(self) -> bool:
         """Check if platform is AMP."""
         return self._platform == "amp"
+
+    @property
+    def debug(self) -> DebugConfig:
+        """Return product debug configuration."""
+        return self._debug
 
     @property
     def ignored_cores(self) -> List[str]:

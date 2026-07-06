@@ -396,6 +396,9 @@ These fields are parsed by :class:`ntfc.productconfig.ProductConfig`.
    * - ``ignored_cores``
      - (Optional) List of core names to skip when collecting core topology
        info via ``get_core_info``. Defaults to ``["dsp"]``
+   * - ``debug``
+     - (Optional) Advanced debug features: coredump collection and GDB
+       integration. See :doc:`debug/index`
 
 Core Configuration Fields
 =========================

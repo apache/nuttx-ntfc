@@ -34,6 +34,7 @@ dependencies = [
          "pexpect",
          "psutil",
          "pyserial",
+         "lzf",
          "pytest",
          "pytest-dependency",
          "pytest-html",
