@@ -18,6 +18,8 @@
 #
 ############################################################################
 
+from unittest.mock import MagicMock
+
 import pytest
 from pexpect.exceptions import ExceptionPexpect
 
@@ -186,6 +188,18 @@ def test_device_host_reboot_boot_wait_failure(envconfig_dummy, monkeypatch):
 
     # soft: command sent but device never comes back up
     assert dev.reboot(1, hard=False) is False
+
+
+def test_device_host_pid(envconfig_dummy):
+
+    conf = envconfig_dummy.product[0].cfg_core(0)
+    dev = DeviceHost2(conf)
+
+    assert dev.pid is None
+
+    dev._child = MagicMock()
+    dev._child.pid = 4242
+    assert dev.pid == 4242
 
 
 # TODO: more tests for host device !!!!

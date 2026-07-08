@@ -15,6 +15,7 @@ for NuttX.
    config-yaml
    multi-session
    session-json
+   debug/index
    report
    api
 

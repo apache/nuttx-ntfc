@@ -30,6 +30,7 @@ import pytest
 import yaml  # type: ignore
 from pluggy import HookimplMarker
 
+from ntfc.debug.getdebug import get_debug_setup
 from ntfc.envconfig import EnvConfig
 from ntfc.log.logger import logger
 from ntfc.log.manager import LogManager
@@ -369,12 +370,19 @@ class MyPytest:
         # run pytest with our custom test plugin
         runner = RunnerPlugin(nologs)
 
+        # optional debug plugins (coredump collection)
+        debug = get_debug_setup(pytest.products)
+        self._ptconfig.set_restart_gdb(debug.restart_all_controllers)
+
         # start device before test start
         self._device_start()
 
         try:
-            return self._run(opt, [runner, collector])
+            # attach GDB controllers after the devices are up
+            debug.start(pytest.result_dir)
+            return self._run(opt, [runner, collector, *debug.plugins])
         finally:
+            debug.stop()
             self._device_stop()
 
     def collect(self, testpath: str, reinit: bool = True) -> "Collected":

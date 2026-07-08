@@ -51,6 +51,7 @@ class DeviceCommon(ABC):
     """Device common interface."""
 
     _BUSY_LOOP_TIMEOUT = 180  # 180 sec with no data read from target
+    _OUTPUT_TAIL_MAX = 4 * 1024 * 1024
 
     def __init__(self, conf: "CoreConfig", echo: bool = True):
         """Initialize common device."""
@@ -74,6 +75,7 @@ class DeviceCommon(ABC):
         self._read_all_sleep = 0.1
         self._has_echo = echo
         self._start_time: Optional[float] = None
+        self._output_tail_buf = bytearray()
 
     def _mark_started(self) -> None:
         """Mark device start time for runtime tracking."""
@@ -84,6 +86,38 @@ class DeviceCommon(ABC):
         if self._start_time is None:
             return None
         return time.monotonic() - self._start_time
+
+    @property
+    def pid(self) -> Optional[int]:
+        """Return the device process PID, or ``None`` when not host-based."""
+        return None
+
+    def _output_tail_append(self, data: bytes) -> None:
+        """Append raw output to the capped tail buffer.
+
+        :param data: Raw bytes read from the device.
+        """
+        self._output_tail_buf.extend(data)
+        if len(self._output_tail_buf) > self._OUTPUT_TAIL_MAX:
+            del self._output_tail_buf[: -self._OUTPUT_TAIL_MAX]
+
+    def output_tail(self) -> str:
+        """Return the most recent raw device output.
+
+        :return: Up to ``_OUTPUT_TAIL_MAX`` bytes of output, decoded.
+        """
+        return self._output_tail_buf.decode(errors="replace")
+
+    def reset_output_tail(self) -> None:
+        """Discard the buffered output tail.
+
+        Called by consumers (e.g.
+        :class:`~ntfc.debug.coredump.syslog_handler.SyslogHandler`)
+        once they have read :meth:`output_tail`, so markers from an
+        earlier, unrelated crash cannot be picked up again by a later
+        test that merely reuses the same handler.
+        """
+        self._output_tail_buf.clear()
 
     def _log_device_line(self, line: str) -> None:
         """Log or buffer a pre-formatted device log line."""
@@ -150,6 +184,7 @@ class DeviceCommon(ABC):
         while True:
             chunk = self._read()
             output += chunk
+            self._output_tail_append(chunk)
             time_now = time.time()
 
             # check for any sign of system crash

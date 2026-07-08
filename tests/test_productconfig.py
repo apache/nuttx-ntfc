@@ -244,6 +244,57 @@ def test_product_config_cfg_core():
         p.cfg_core(5)
 
 
+def test_product_config_debug_defaults():
+    """Test debug property defaults when the section is absent."""
+
+    conf = {
+        "name": "product",
+        "cores": {"core0": {"name": "main", "device": "sim"}},
+    }
+
+    p = ProductConfig(conf)
+    assert p.debug.coredump.enable is False
+    assert p.debug.coredump.collection_type == "auto"
+    assert p.debug.gdb.enable is False
+
+
+def test_product_config_debug_parsing():
+    """Test debug property with a full debug section."""
+
+    conf = {
+        "name": "product",
+        "cores": {"core0": {"name": "main", "device": "sim"}},
+        "debug": {
+            "coredump": {"enable": True, "type": "gdb", "limit": 3},
+            "gdb": {"enable": True, "target": "localhost:1234"},
+            "fastboot": {"dev_sn": "ABC123"},
+            "ymodem": {"serial_port": "/dev/ttyUSB0"},
+        },
+    }
+
+    p = ProductConfig(conf)
+    assert p.debug.coredump.enable is True
+    assert p.debug.coredump.collection_type == "gdb"
+    assert p.debug.coredump.limit == 3
+    assert p.debug.gdb.enable is True
+    assert p.debug.gdb.target == "localhost:1234"
+    assert p.debug.fastboot.dev_sn == "ABC123"
+    assert p.debug.ymodem.serial_port == "/dev/ttyUSB0"
+
+
+def test_product_config_debug_invalid():
+    """Test that an invalid coredump type raises ValueError."""
+
+    conf = {
+        "name": "product",
+        "cores": {"core0": {"name": "main", "device": "sim"}},
+        "debug": {"coredump": {"type": "bogus"}},
+    }
+
+    with pytest.raises(ValueError):
+        ProductConfig(conf)
+
+
 def test_product_config_platform_properties():
     """Test platform, is_smp, and is_amp properties."""
 

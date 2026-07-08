@@ -23,6 +23,8 @@ from dummydev import DeviceDummy
 
 from ntfc.envconfig import EnvConfig
 
+pytest_plugins = ["pytester"]
+
 
 @pytest.fixture
 def config_dummy():
