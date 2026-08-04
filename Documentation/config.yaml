@@ -70,6 +70,13 @@ product:                          # many products can be supported in tests (pro
       exec_args: ''               # Args for emulator execution for QEMU tragets.
                                   # Serial port configuration for serial targets, eg '9600,n,8,1'
                                   # Empty for simulator.
+      exec_cwd: ''                # (optional) working directory for the spawned sim/qemu process.
+                                  # Kernel-mode hostfs mounts resolve relative to this directory.
+                                  # Defaults to the core build directory for kernel-mode builds.
+      boot_timeout: 5             # (optional) seconds to wait for the first shell prompt. Defaults to 5
+      app_bindir: ''              # (optional) directory with kernel-mode application binaries.
+                                  # Defaults to the bin/ directory next to the NuttX ELF
+                                  # for kernel-mode builds.
 
                                   # NTFC can use pre-build image or build it from defconfig
                                   # the behavior will depend on the parameters specified in config.

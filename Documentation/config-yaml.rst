@@ -419,6 +419,17 @@ These fields are parsed by :class:`ntfc.coreconfig.CoreConfig`.
        etc.)
    * - ``exec_args``
      - QEMU arguments or serial settings
+   * - ``exec_cwd``
+     - (Optional) Working directory for the spawned sim/qemu process.
+       Kernel-mode hostfs mounts resolve relative to this directory.
+       Defaults to the core build directory for kernel-mode builds
+   * - ``boot_timeout``
+     - (Optional) Seconds to wait for the first shell prompt after device
+       start. Defaults to ``5``
+   * - ``app_bindir``
+     - (Optional) Directory with kernel-mode application binaries. Defaults
+       to the ``bin/`` directory next to the NuttX ELF for kernel-mode
+       builds (``CONFIG_BUILD_KERNEL=y``)
    * - ``defconfig``
      - Path to NuttX defconfig (auto-build)
    * - ``elf_path``

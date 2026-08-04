@@ -20,6 +20,7 @@
 
 """Product core configuration handler."""
 
+import os
 from typing import Any, Dict, Optional, Union
 
 from ntfc.lib.elf.elf_parser import ElfParser
@@ -143,6 +144,37 @@ class CoreConfig:
         requirements validation, and no command execution against them.
         """
         return bool(self._config.get("flash_only", False))
+
+    @property
+    def is_kernel_build(self) -> bool:
+        """Return True when the core .config has CONFIG_BUILD_KERNEL=y."""
+        return self.kv_check("CONFIG_BUILD_KERNEL") is True
+
+    @property
+    def exec_cwd(self) -> Optional[str]:
+        """Return working directory for spawned sim/qemu processes.
+
+        Kernel-mode hostfs mounts resolve relative to this directory.
+        """
+        return self._config.get("exec_cwd", None)
+
+    @property
+    def boot_timeout(self) -> int:
+        """Return seconds to wait for the first shell prompt after start."""
+        return int(self._config.get("boot_timeout", 5))
+
+    @property
+    def app_bindir(self) -> Optional[str]:
+        """Return directory with kernel-mode application binaries.
+
+        Defaults to the bin/ directory next to the NuttX ELF.
+        """
+        bindir = self._config.get("app_bindir", None)
+        if bindir:
+            return str(bindir)
+        if self.is_kernel_build and self.elf_path:
+            return os.path.join(os.path.dirname(self.elf_path), "bin")
+        return None
 
     def kv_check(self, cfg: str) -> Any:
         """Check Kconfig option and return its value.

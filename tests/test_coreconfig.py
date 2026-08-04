@@ -97,6 +97,68 @@ def test_core_config_flash_only_property():
     assert CoreConfig({"name": "test"}).flash_only is False
 
 
+def test_core_config_is_kernel_build(tmp_path):
+    cfg_file = tmp_path / "kv_config"
+    cfg_file.write_text("CONFIG_BUILD_KERNEL=y\n")
+    assert (
+        CoreConfig({"name": "t", "conf_path": str(cfg_file)}).is_kernel_build
+        is True
+    )
+
+    cfg_file.write_text("CONFIG_BUILD_FLAT=y\n")
+    assert (
+        CoreConfig({"name": "t", "conf_path": str(cfg_file)}).is_kernel_build
+        is False
+    )
+
+    # no .config at all
+    assert CoreConfig({"name": "t"}).is_kernel_build is False
+
+
+def test_core_config_exec_cwd():
+    assert (
+        CoreConfig({"name": "t", "exec_cwd": "/some/dir"}).exec_cwd
+        == "/some/dir"
+    )
+    assert CoreConfig({"name": "t"}).exec_cwd is None
+
+
+def test_core_config_boot_timeout():
+    assert CoreConfig({"name": "t", "boot_timeout": 15}).boot_timeout == 15
+    assert CoreConfig({"name": "t"}).boot_timeout == 5
+
+
+def test_core_config_app_bindir(tmp_path):
+    kernel_cfg = tmp_path / "kv_config"
+    kernel_cfg.write_text("CONFIG_BUILD_KERNEL=y\n")
+
+    # explicit YAML value always wins
+    conf = {"name": "t", "app_bindir": "/custom/bin"}
+    assert CoreConfig(conf).app_bindir == "/custom/bin"
+
+    # kernel build: derived from elf_path sibling bin/
+    conf = {
+        "name": "t",
+        "conf_path": str(kernel_cfg),
+        "elf_path": "./tests/resources/nuttx/sim/nuttx",
+    }
+    assert CoreConfig(conf).app_bindir == "./tests/resources/nuttx/sim/bin"
+
+    # kernel build without elf_path: nothing to derive from
+    assert (
+        CoreConfig({"name": "t", "conf_path": str(kernel_cfg)}).app_bindir
+        is None
+    )
+
+    # flat build: never derived
+    conf = {
+        "name": "t",
+        "conf_path": "./tests/resources/nuttx/sim/kv_config",
+        "elf_path": "./tests/resources/nuttx/sim/nuttx",
+    }
+    assert CoreConfig(conf).app_bindir is None
+
+
 def test_core_config_prompt():
     # Test with explicit prompt in YAML config
     conf = {
