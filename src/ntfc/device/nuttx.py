@@ -51,6 +51,13 @@ class DeviceNuttx(OSCommon):
             b"up_dump_register",
             b"dump_tasks",
         ],
+        # kernel-mode (CONFIG_BUILD_KERNEL) user task faults: the kernel
+        # kills the offending task and keeps running, so the console
+        # message is the only crash evidence
+        CrashType.SEGFAULT: [
+            b"Segmentation fault in",
+            b"PANIC: Unhandled user exception",
+        ],
     }
     _PANIC_CHAR = r"/"
 

@@ -43,6 +43,22 @@ def test_device_nuttx_init():
         assert CrashType.ASSERTION in sigs
         assert all(isinstance(v, list) for v in sigs.values())
 
+        # kernel-mode user task faults kill only the task; the console
+        # message is the only crash evidence
+        assert CrashType.SEGFAULT in sigs
+        assert b"Segmentation fault in" in sigs[CrashType.SEGFAULT]
+        assert b"PANIC: Unhandled user exception" in sigs[CrashType.SEGFAULT]
+
+        # real rv-virt knsh64 console output is classified as SEGFAULT
+        from ntfc.device.state import DeviceStateManager
+
+        mgr = DeviceStateManager(crash_signatures=sigs)
+        line = (
+            b"[    2.966000] riscv_fault_handler: "
+            b"Segmentation fault in getprime (PID 4: getprime)"
+        )
+        assert mgr._detect_crash_type(line) is CrashType.SEGFAULT
+
         config.kv_check.return_value = 0
         assert d.panic_char == ""
         config.kv_check.return_value = 1
