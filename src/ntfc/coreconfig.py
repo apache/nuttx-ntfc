@@ -45,6 +45,25 @@ class CoreConfig:
             # load ELF
             self._elf = ElfParser(elf_path)
 
+    @staticmethod
+    def _parse_config_value(val: str) -> Union[bool, str, int]:
+        """Parse a single Kconfig option value."""
+        if val == "y":
+            return True
+        if val == "n":
+            return False
+        if val.startswith('"') and val.endswith('"'):
+            # quoted strings first: they may contain hex digits
+            return val[1:-1]
+        if val.startswith("0x"):
+            try:
+                return int(val, 16)
+            except ValueError:
+                return val
+        if val.isdigit():
+            return int(val)
+        return val
+
     def _load_core_config(self) -> None:
         """Load core configuration."""
         with open(self._config["conf_path"], "r", encoding="utf-8") as f:
@@ -59,22 +78,7 @@ class CoreConfig:
                     # no '=' found — skip malformed line
                     continue
 
-                # parse option value
-                val_parsed: Union[bool, str, int]
-                if val == "y":
-                    val_parsed = True
-                elif val == "n":
-                    val_parsed = False
-                elif "0x" in val:
-                    val_parsed = int(val.rstrip(), 16)
-                elif val.isdigit():
-                    val_parsed = int(val)
-                elif val.startswith('"') and val.endswith('"'):
-                    val_parsed = val[1:-1]
-                else:
-                    val_parsed = val
-
-                self._kv_values[name] = val_parsed
+                self._kv_values[name] = self._parse_config_value(val)
 
     @property
     def uptime(self) -> Any:

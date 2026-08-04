@@ -79,6 +79,8 @@ def test_load_core_config_value_types(tmp_path):
         "CONFIG_BOOL_N=n\n"
         'CONFIG_QUOTED="hello"\n'
         "CONFIG_UNQUOTED=plain_text\n"
+        'CONFIG_QUOTED_HEX="{0x40000000,0x100}"\n'
+        "CONFIG_BAD_HEX=0xZZ\n"
     )
     conf = {"name": "dummy", "conf_path": str(cfg_file)}
     p = CoreConfig(conf)
@@ -89,6 +91,10 @@ def test_load_core_config_value_types(tmp_path):
     assert p.kv_check("CONFIG_BOOL_N") is False
     assert p.kv_check("CONFIG_QUOTED") == "hello"
     assert p.kv_check("CONFIG_UNQUOTED") == "plain_text"
+    # quoted values containing hex digits must stay strings
+    assert p.kv_check("CONFIG_QUOTED_HEX") == "{0x40000000,0x100}"
+    # unparsable hex falls back to the raw string
+    assert p.kv_check("CONFIG_BAD_HEX") == "0xZZ"
 
 
 def test_core_config_flash_only_property():
