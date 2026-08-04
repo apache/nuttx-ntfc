@@ -5,4 +5,6 @@ dependencies: ["toml"] # python dependencies for test cases module
 requirements:          # nuttx config requirements
   - ["CONFIG_DEBUG_SYMBOLS", True]
   - ["CONFIG_SYSTEM_NSH", True]
-  - ["CONFIG_INIT_ENTRYPOINT", "nsh_main"]
+  # alternatives: any one entry satisfies the requirement;
+  # "*" accepts any set value
+  - [["CONFIG_INIT_ENTRYPOINT", "nsh_main"], ["CONFIG_INIT_FILEPATH", "*"]]

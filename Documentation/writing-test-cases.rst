@@ -70,6 +70,20 @@ String/Value Requirements:
      - ["CONFIG_INIT_ENTRYPOINT", "nsh_main"]  # CONFIG must equal value
      - ["CONFIG_TASK_NAME_SIZE", "32"]         # CONFIG must equal value
 
+Wildcard Requirements:
+
+.. code-block:: yaml
+
+   requirements:
+     - ["CONFIG_INIT_FILEPATH", "*"]           # CONFIG must be set (any value)
+
+Alternative Requirements (any one entry satisfies the requirement):
+
+.. code-block:: yaml
+
+   requirements:
+     - [["CONFIG_INIT_ENTRYPOINT", "nsh_main"], ["CONFIG_INIT_FILEPATH", "*"]]
+
 How Requirements Work:
 
 1. NTFC reads NuttX ``.config`` file from configuration

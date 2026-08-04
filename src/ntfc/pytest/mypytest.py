@@ -124,14 +124,31 @@ class MyPytest:
             json.dump(self._config.config, f, indent=2, sort_keys=True)
             f.write("\n")
 
+    def _req_satisfied(self, product: Product, core: int, req: Any) -> bool:
+        """Check a single ntfc.yaml requirement entry.
+
+        Supported entry forms:
+
+        - ``[key, value]``: config value must equal ``value``
+        - ``[key, "*"]``: any truthy config value satisfies
+        - ``[[key, value], ...]``: alternatives, any one satisfies
+        """
+        if isinstance(req[0], list):
+            return any(self._req_satisfied(product, core, r) for r in req)
+
+        value = product.conf.kv_check(req[0], core)
+        if req[1] == "*":
+            return bool(value)
+        return bool(value == req[1])
+
     def _kv_validate(
         self, product: Product, core: int
-    ) -> Tuple[bool, Optional[Any]]:  # pragma: no cover
+    ) -> Tuple[bool, Optional[Any]]:
         """Check if configuration can be used with this tool."""
         requirements = pytest.ntfcyaml.get("requirements", {})
 
         for req in requirements:
-            if product.conf.kv_check(req[0], core) != req[1]:
+            if not self._req_satisfied(product, core, req):
                 return False, req
         return True, None
 
@@ -143,9 +160,12 @@ class MyPytest:
 
             # check config requirements only on cores that participate in tests
             for core in p.conf.active_core_indices:
-                ret = self._kv_validate(p, core)
-                if ret[0] is False:  # pragma: no cover
-                    raise IOError(f"Missing kconfig dependency: {ret[1]}")
+                ok, req = self._kv_validate(p, core)
+                if not ok:
+                    raise IOError(
+                        f"product '{p.conf.name}' core {core}: "
+                        f"missing kconfig requirement: {req}"
+                    )
 
             tmp.append(p)
 

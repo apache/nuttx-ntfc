@@ -212,6 +212,76 @@ def test_create_products_skips_requirements_for_flash_only_core(
     assert products[0].cores == ["cpuapp"]
 
 
+def test_create_products_requirement_forms(device_dummy, monkeypatch):
+    import pytest as pytest_module
+
+    config = {
+        "config": {},
+        "product": {
+            "name": "product",
+            "cores": {
+                "core0": {
+                    "name": "cpuapp",
+                    "device": "sim",
+                    "conf_path": "./tests/resources/nuttx/sim/kv_config",
+                    "elf_path": "./tests/resources/nuttx/sim/nuttx",
+                },
+            },
+        },
+    }
+
+    monkeypatch.setattr(
+        pytest_module,
+        "ntfcyaml",
+        {
+            "requirements": [
+                # plain form: exact match
+                ["CONFIG_HOST_LINUX", True],
+                # alternatives: first unset, second matches
+                [
+                    ["CONFIG_INIT_FILEPATH", "*"],
+                    ["CONFIG_INIT_ENTRYPOINT", "nsh_main"],
+                ],
+                # wildcard: any truthy value
+                ["CONFIG_NSH_PROMPT_STRING", "*"],
+            ]
+        },
+        raising=False,
+    )
+    with patch("ntfc.cores.get_device", return_value=device_dummy):
+        products = MyPytest(config)._create_products(EnvConfig(config))
+    assert len(products) == 1
+
+
+def test_create_products_requirement_unmet(device_dummy, monkeypatch):
+    import pytest as pytest_module
+
+    config = {
+        "config": {},
+        "product": {
+            "name": "product",
+            "cores": {
+                "core0": {
+                    "name": "cpuapp",
+                    "device": "sim",
+                    "conf_path": "./tests/resources/nuttx/sim/kv_config",
+                    "elf_path": "./tests/resources/nuttx/sim/nuttx",
+                },
+            },
+        },
+    }
+
+    monkeypatch.setattr(
+        pytest_module,
+        "ntfcyaml",
+        {"requirements": [["CONFIG_INIT_FILEPATH", "*"]]},
+        raising=False,
+    )
+    with patch("ntfc.cores.get_device", return_value=device_dummy):
+        with pytest.raises(IOError, match="product.*core 0.*INIT_FILEPATH"):
+            MyPytest(config)._create_products(EnvConfig(config))
+
+
 def test_device_stop_calls_stop(config_dummy, device_dummy):
     """_device_stop calls device.stop() for each core."""
     with patch("ntfc.cores.get_device", return_value=device_dummy):
