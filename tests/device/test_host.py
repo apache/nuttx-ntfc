@@ -23,6 +23,7 @@ from unittest.mock import MagicMock
 import pytest
 from pexpect.exceptions import ExceptionPexpect
 
+from ntfc.coreconfig import CoreConfig
 from ntfc.device.host import DeviceHost
 
 
@@ -200,6 +201,38 @@ def test_device_host_pid(envconfig_dummy):
     dev._child = MagicMock()
     dev._child.pid = 4242
     assert dev.pid == 4242
+
+
+def test_device_host_exec_cwd_boot_timeout(tmp_path, monkeypatch):
+
+    conf = CoreConfig(
+        {"name": "t", "exec_cwd": str(tmp_path), "boot_timeout": 9}
+    )
+    dev = DeviceHost2(conf)
+
+    spawn_kwargs = {}
+    boot_timeouts = []
+
+    class FakeChild:
+        pid = 1
+
+    def fake_spawn(cmd, **kwargs):
+        spawn_kwargs.update(kwargs)
+        return FakeChild()
+
+    def fake_wait(timeout=5):
+        boot_timeouts.append(timeout)
+        return True
+
+    monkeypatch.setattr("ntfc.device.host.pexpect.spawn", fake_spawn)
+    monkeypatch.setattr(dev, "_wait_for_boot", fake_wait)
+
+    dev.host_open(["dummy"])
+
+    # exec_cwd is passed to the spawned process
+    assert spawn_kwargs["cwd"] == str(tmp_path)
+    # boot wait uses the configured boot_timeout
+    assert boot_timeouts == [9]
 
 
 # TODO: more tests for host device !!!!

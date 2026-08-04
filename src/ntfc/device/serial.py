@@ -150,7 +150,7 @@ class DeviceSerial(DeviceCommon):
         # reboot device if possible
         self.reboot()
 
-        ret = self._wait_for_boot()
+        ret = self._wait_for_boot(self._conf.boot_timeout)
         if ret is False:
             raise TimeoutError("device boot timeout")
 

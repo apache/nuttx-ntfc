@@ -50,7 +50,7 @@ class DeviceHost(DeviceCommon):
         """
         DeviceCommon.__init__(self, conf)
         self._child = None
-        self._cwd = None
+        self._cwd = conf.exec_cwd
         self._cmd: Optional[List[str]] = None
 
     @property
@@ -139,7 +139,7 @@ class DeviceHost(DeviceCommon):
 
         time.sleep(uptime)
 
-        ret = self._wait_for_boot()
+        ret = self._wait_for_boot(self._conf.boot_timeout)
         if ret is False:  # pragma: no cover
             raise TimeoutError("device boot timeout")
 

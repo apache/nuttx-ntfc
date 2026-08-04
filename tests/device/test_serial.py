@@ -137,3 +137,31 @@ def test_device_sim_init(serial_config, serial_pair):
 
     stop.set()
     device_thread.join(timeout=1)
+
+
+def test_device_serial_boot_timeout(serial_pair, monkeypatch):
+
+    config = CoreConfig(
+        {
+            "name": "main",
+            "device": "serial",
+            "exec_path": serial_pair[1],
+            "boot_timeout": 9,
+        }
+    )
+    ser = DeviceSerial(config)
+
+    boot_timeouts = []
+
+    def fake_wait(timeout=5):
+        boot_timeouts.append(timeout)
+        return True
+
+    monkeypatch.setattr(ser, "_wait_for_boot", fake_wait)
+    monkeypatch.setattr(ser, "reboot", lambda *args, **kwargs: True)
+
+    ser._start_impl()
+    ser.stop()
+
+    # boot wait uses the configured boot_timeout
+    assert boot_timeouts == [9]
