@@ -165,6 +165,36 @@ def test_core_config_app_bindir(tmp_path):
     assert CoreConfig(conf).app_bindir is None
 
 
+def test_core_config_read_poll_interval() -> None:
+    assert CoreConfig({"name": "test"}).read_poll_interval == 0.1
+    assert (
+        CoreConfig(
+            {"name": "test", "read_poll_interval": 0.001}
+        ).read_poll_interval
+        == 0.001
+    )
+    with pytest.raises(ValueError, match="must be positive"):
+        _ = CoreConfig(
+            {"name": "test", "read_poll_interval": 0}
+        ).read_poll_interval
+
+
+def test_core_config_os_defaults_to_nuttx() -> None:
+    assert CoreConfig({"name": "test"}).os == "nuttx"
+    assert CoreConfig({"name": "test", "os": "Linux"}).os == "linux"
+
+
+def test_linux_kernel_image_does_not_require_elf_symbols(tmp_path) -> None:
+    image = tmp_path / "bzImage"
+    image.write_bytes(b"not-an-elf")
+
+    core = CoreConfig({"name": "linux", "os": "linux", "elf_path": str(image)})
+
+    assert core.elf_path == str(image)
+    with pytest.raises(AttributeError):
+        core.cmd_check("rtbench")
+
+
 def test_core_config_prompt():
     # Test with explicit prompt in YAML config
     conf = {

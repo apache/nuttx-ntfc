@@ -39,6 +39,7 @@ class NuttXBuilder:
 
     IMAGE_BIN_STR = "$IMAGE_BIN"
     IMAGE_HEX_STR = "$IMAGE_HEX"
+    IMAGE_ELF_STR = "$IMAGE_ELF"
     _KCONFIG_DISABLED_RE = re.compile(
         r"^#\s+(CONFIG_[A-Za-z0-9_]+)\s+is not set"
     )
@@ -98,6 +99,12 @@ class NuttXBuilder:
         if isinstance(custom_defines, dict):
             defines.update(
                 {str(key): str(val) for key, val in custom_defines.items()}
+            )
+
+        apps_dir = self._cfg_values.get("config", {}).get("apps_dir")
+        if apps_dir:
+            defines["NUTTX_APPS_DIR"] = os.path.abspath(
+                os.path.expanduser(os.path.expandvars(str(apps_dir)))
             )
 
         return defines
@@ -348,6 +355,20 @@ class NuttXBuilder:
 
         self._run_command(cmd, env=run_env)
 
+    def _run_build_target(
+        self,
+        build: str,
+        target: str,
+        env: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """Run one named CMake build target."""
+        cmd = ["cmake", "--build", str(Path(build)), "--target", target]
+        run_env = os.environ.copy()
+        if env:
+            run_env.update(env)
+
+        self._run_command(cmd, env=run_env)
+
     def _build_core(
         self, core: str, cores: Dict[str, Any], product: str
     ) -> None:
@@ -371,13 +392,24 @@ class NuttXBuilder:
             if not cfg_cwd:  # pragma: no cover
                 raise BuilderConfigError("not found cwd in YAML configuration")
 
+            cfg_build_dir = os.path.expanduser(
+                os.path.expandvars(str(cfg_build_dir))
+            )
             build_path = os.path.join(cfg_build_dir, build_dir)
             build_cfg = cores[core]["defconfig"]
             logger.info(
                 f"build image " f"conf: {build_cfg}, out: {build_path}"
             )
 
-            nuttx_dir = os.path.join(cfg_cwd, "nuttx")
+            cfg_cwd = os.path.expanduser(os.path.expandvars(str(cfg_cwd)))
+            configured_nuttx_dir = self._cfg_values["config"].get("nuttx_dir")
+            nuttx_dir = (
+                os.path.expanduser(
+                    os.path.expandvars(str(configured_nuttx_dir))
+                )
+                if configured_nuttx_dir
+                else os.path.join(cfg_cwd, "nuttx")
+            )
             nuttx_elf_path = os.path.join(build_path, "nuttx")
             nuttx_conf_path = os.path.join(build_path, ".config")
 
@@ -410,6 +442,15 @@ class NuttXBuilder:
                     nuttx_conf_path, kv_overrides, cfg_cwd
                 )
 
+                # Regenerate include/nuttx/config.h after changing .config.
+                # Otherwise CMake can relink an image built with stale Kconfig
+                # values while the saved .config claims the override applied.
+
+                if kv_overrides:
+                    self._run_build_target(
+                        build_path, "olddefconfig", env=build_env
+                    )
+
                 # build
                 self._run_build(build_path, env=build_env)
 
@@ -439,6 +480,7 @@ class NuttXBuilder:
 
             flash_cmd = flash_cmd.replace(self.IMAGE_BIN_STR, image_bin)
             flash_cmd = flash_cmd.replace(self.IMAGE_HEX_STR, image_hex)
+            flash_cmd = flash_cmd.replace(self.IMAGE_ELF_STR, str(img_path))
 
             cmd = flash_cmd.split()
 

@@ -22,6 +22,7 @@
 
 from typing import TYPE_CHECKING
 
+from .linux import DeviceLinux
 from .nuttx import DeviceNuttx
 
 if TYPE_CHECKING:
@@ -36,4 +37,11 @@ if TYPE_CHECKING:
 
 def get_os(conf: "CoreConfig") -> "OSCommon":
     """Get OS abstraction."""
-    return DeviceNuttx(conf)  # only NuttX supported now
+    operating_systems = {
+        "linux": DeviceLinux,
+        "nuttx": DeviceNuttx,
+    }
+    factory = operating_systems.get(conf.os)
+    if factory is None:
+        raise ValueError(f"unsupported operating system: {conf.os}")
+    return factory(conf)

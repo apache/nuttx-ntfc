@@ -310,6 +310,8 @@ configuration section:
   config:
     cwd: './external'
     build_dir: './build'     # Build output directory
+    nuttx_dir: './external/nuttx'       # Optional explicit NuttX tree
+    apps_dir: './external/nuttx-apps'   # Optional explicit apps tree
     build_env:               # Optional env vars for cmake configure/build
       CC: gcc-14
       CXX: g++-14
@@ -350,6 +352,7 @@ Flash command can use special tags that are handled by NTFC:
 
 - ``$IMAGE_BIN`` is replaced by path to ``nuttx.bin``.
 - ``$IMAGE_HEX`` is replaced by path to ``nuttx.hex``.
+- ``$IMAGE_ELF`` is replaced by path to the core image (``elf_path``).
 
 Example usage with ``st-flash`` tool:
 
@@ -414,6 +417,8 @@ These fields are parsed by :class:`ntfc.coreconfig.CoreConfig`.
      - Human-readable core name
    * - ``device``
      - Device type: ``sim``, ``qemu``, or ``serial``
+   * - ``os``
+     - Target shell type: ``nuttx`` (default) or ``linux``
    * - ``exec_path``
      - QEMU executable name or serial port device (``/dev/ttyACM0``, ``COM1``,
        etc.)
@@ -426,6 +431,9 @@ These fields are parsed by :class:`ntfc.coreconfig.CoreConfig`.
    * - ``boot_timeout``
      - (Optional) Seconds to wait for the first shell prompt after device
        start. Defaults to ``5``
+   * - ``read_poll_interval``
+     - (Optional) Console polling interval in seconds used when reading
+       device output. Must be positive. Defaults to ``0.1``
    * - ``app_bindir``
      - (Optional) Directory with kernel-mode application binaries. Defaults
        to the ``bin/`` directory next to the NuttX ELF for kernel-mode
@@ -455,3 +463,34 @@ These fields are parsed by :class:`ntfc.coreconfig.CoreConfig`.
    * - ``kv``
      - Per-core Kconfig overrides applied before build. Overrides matching
        keys from global ``config.kv``
+
+Linux Targets
+=============
+
+Setting ``os: linux`` on a core switches the shell abstraction from NuttX
+to Linux: shell prompt (``#`` by default), command-not-found marker,
+``poweroff``/``reboot``/``uname`` commands and kernel crash signatures.
+This allows running the same test suites against Linux and NuttX, which is
+useful for comparing the two systems (e.g. benchmarks).
+
+Linux images are pre-built, so NTFC does not build them: point ``elf_path``
+at the kernel image and pass boot arguments via ``exec_args`` (with the
+``$IMAGE_ELF`` placeholder) or a ``flash`` command. ELF symbol parsing and
+NuttX core topology discovery are skipped for Linux cores, which also means
+the ``cmd_check`` pytest marker is not supported on them.
+
+Example QEMU Linux core:
+
+.. code-block:: yaml
+
+   cores:
+     core0:
+       name: 'linux'
+       os: 'linux'
+       device: 'qemu'
+       exec_path: 'qemu-system-x86_64'
+       exec_args: '-M q35 -m 2G -nographic -kernel $IMAGE_ELF
+                   -initrd ./initramfs.img -append "console=ttyS0"'
+       elf_path: './bzImage'
+       prompt: '# '
+       boot_timeout: 60

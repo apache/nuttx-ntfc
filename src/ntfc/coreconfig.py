@@ -42,7 +42,7 @@ class CoreConfig:
             self._load_core_config()
 
         elf_path = self._config.get("elf_path", None)
-        if elf_path:
+        if elf_path and self.os == "nuttx":
             # load ELF
             self._elf = ElfParser(elf_path)
 
@@ -87,9 +87,22 @@ class CoreConfig:
         return self._config.get("uptime", 3)
 
     @property
+    def read_poll_interval(self) -> float:
+        """Return console polling interval in seconds."""
+        value = float(self._config.get("read_poll_interval", 0.1))
+        if value <= 0:
+            raise ValueError("read_poll_interval must be positive")
+        return value
+
+    @property
     def device(self) -> Any:
         """Return core device."""
         return self._config.get("device", None)
+
+    @property
+    def os(self) -> str:
+        """Return target operating system name."""
+        return str(self._config.get("os", "nuttx")).lower()
 
     @property
     def name(self) -> Any:

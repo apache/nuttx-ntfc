@@ -30,6 +30,8 @@ def test_device_qemu_open():
     with patch("ntfc.coreconfig.CoreConfig") as mockdevice:
         config = mockdevice.return_value
 
+        config.os = "nuttx"
+        config.read_poll_interval = 0.1
         config.exec_path = ""
         config.exec_args = ""
         config.elf_path = ""

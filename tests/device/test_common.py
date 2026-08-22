@@ -33,10 +33,14 @@ g_mock_read = b""
 
 class DeviceMock(DeviceCommon):
 
-    def __init__(self, _):
+    def __init__(self, config):
         """Mock."""
 
-        DeviceCommon.__init__(self, _)
+        if not isinstance(config.os, str):
+            config.os = "nuttx"
+        if not isinstance(config.read_poll_interval, (int, float)):
+            config.read_poll_interval = 0.1
+        DeviceCommon.__init__(self, config)
 
     def _read(self, _=0):
         """Mock."""
@@ -100,6 +104,11 @@ def test_device_common_init():
         assert d.crash is False
         assert d.busyloop is False
         assert d.flood is False
+
+        config.os = "nuttx"
+        config.read_poll_interval = 0.01
+        explicit = DeviceMock(config)
+        assert explicit._read_all_sleep == 0.01
 
 
 def test_device_common_send_cmd_pattern():
@@ -221,6 +230,19 @@ def test_device_common_read_until_pattern():
         # TypeError for non-bytes pattern
         with pytest.raises(TypeError):
             dev.read_until_pattern("PASS", 10)
+
+
+def test_device_common_read_until_pattern_uses_configured_poll_interval():
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        config = mockdevice.return_value
+        config.read_poll_interval = 0.001
+        dev = DeviceMock(config)
+
+        with patch.object(dev, "_read_all", return_value=b"PASS") as read_all:
+            ret = dev.read_until_pattern(b"PASS", 1)
+
+        assert ret.status == CmdStatus.SUCCESS
+        read_all.assert_called_once_with(0.001)
 
 
 def test_device_common_panic_char():

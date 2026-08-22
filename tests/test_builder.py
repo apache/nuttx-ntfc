@@ -105,6 +105,47 @@ def test_builder_passes_build_env() -> None:
     assert calls[1][1]["CXX"] == "g++-14"
 
 
+def test_builder_regenerates_config_after_kconfig_overrides() -> None:
+    config = copy.deepcopy(conf_dir)
+    config["product"]["cores"]["core0"]["defconfig"] = "dummy/path"
+    config["product"]["cores"]["core0"]["kv"] = {
+        "CONFIG_ARCH_X86_64_IDLE_NOP": True
+    }
+    calls = []
+
+    builder = NuttXBuilder(config)
+    builder._run_command = lambda command, env: calls.append(command)
+    builder._make_dir = builder_make_dir_dummy
+    builder._apply_kconfig_overrides = lambda *_args: None
+    builder.build_all()
+
+    assert calls[1] == [
+        "cmake",
+        "--build",
+        "bbb/product-xxx-dummy",
+        "--target",
+        "olddefconfig",
+    ]
+    assert calls[2] == ["cmake", "--build", "bbb/product-xxx-dummy"]
+
+
+def test_builder_run_build_target_passes_env() -> None:
+    builder = NuttXBuilder(copy.deepcopy(conf_dir))
+    calls = []
+    builder._run_command = lambda command, env: calls.append((command, env))
+
+    builder._run_build_target("build-dir", "olddefconfig", {"CC": "gcc-13"})
+
+    assert calls[0][0] == [
+        "cmake",
+        "--build",
+        "build-dir",
+        "--target",
+        "olddefconfig",
+    ]
+    assert calls[0][1]["CC"] == "gcc-13"
+
+
 def test_builder_ignores_invalid_build_env_types() -> None:
     config = copy.deepcopy(conf_dir)
     config["config"]["build_env"] = "CC=gcc-14 CXX=g++-14"
@@ -145,6 +186,33 @@ def test_builder_get_cmake_defines_ignores_invalid_type() -> None:
     assert b._get_cmake_defines({"dcmake": "A=1"}, "defcfg") == {
         "BOARD_CONFIG": "defcfg"
     }
+
+
+def test_builder_accepts_explicit_nuttx_and_apps_directories(tmp_path) -> None:
+    config = copy.deepcopy(conf_dir)
+    build_dir = tmp_path / "build"
+    nuttx_dir = tmp_path / "source" / "nuttx-custom"
+    apps_dir = tmp_path / "source" / "apps-custom"
+    nuttx_dir.mkdir(parents=True)
+    apps_dir.mkdir(parents=True)
+    config["config"].update(
+        {
+            "build_dir": str(build_dir),
+            "nuttx_dir": str(nuttx_dir),
+            "apps_dir": str(apps_dir),
+        }
+    )
+    config["product"]["cores"]["core0"]["defconfig"] = "board:test"
+    calls = []
+
+    builder = NuttXBuilder(config)
+    builder._run_command = lambda command, env: calls.append(command)
+    builder._make_dir = lambda _path: None
+    builder.build_all()
+
+    configure = calls[0]
+    assert f"-S{nuttx_dir}" in configure
+    assert f"-DNUTTX_APPS_DIR={apps_dir}" in configure
 
 
 def test_builder_kconfig_helpers() -> None:
@@ -454,9 +522,11 @@ def test_builder_applies_kv_before_build() -> None:
         with patch("ntfc.builder.logger.info", side_effect=logs.append):
             b.build_all()
 
-        assert len(calls) == 2
+        assert len(calls) == 3
         assert calls[0][0] == "cmake"
         assert calls[1][:2] == ["cmake", "--build"]
+        assert calls[1][-2:] == ["--target", "olddefconfig"]
+        assert calls[2][:2] == ["cmake", "--build"]
         assert any(
             "Applying Kconfig overrides before build:" == msg for msg in logs
         )
@@ -484,3 +554,19 @@ def test_builder_raises_when_cwd_missing() -> None:
         BuilderConfigError, match="not found cwd in YAML configuration"
     ):
         b.build_all()
+
+
+def test_builder_flash_supports_elf_placeholder(tmp_path) -> None:
+    image = tmp_path / "nuttx"
+    image.write_bytes(b"elf")
+    core = {
+        "elf_path": str(image),
+        "flash": "pxe-stage $IMAGE_ELF",
+    }
+    commands = []
+    builder = NuttXBuilder(copy.deepcopy(conf_dir))
+    builder._run_command = lambda command, env: commands.append(command)
+
+    builder._flash_core("core0", {"core0": core})
+
+    assert commands == [["pxe-stage", str(image)]]

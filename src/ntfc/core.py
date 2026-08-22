@@ -334,7 +334,7 @@ class ProductCore:
 
     def init(self) -> None:
         """Finish product initialization."""
-        cores = self.get_core_info()
+        cores = self.get_core_info() if self._conf.os == "nuttx" else ()
         self._core0 = cores[0] if cores else "core0"
         self._cur_core = self._core0
         self._cores = cores if cores else ("core0",)

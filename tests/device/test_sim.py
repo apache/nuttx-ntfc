@@ -30,6 +30,8 @@ def test_device_sim_init():
     with patch("ntfc.coreconfig.CoreConfig") as mockdevice:
         config = mockdevice.return_value
 
+        config.os = "nuttx"
+        config.read_poll_interval = 0.1
         config.elf_path = ""
         sim = DeviceSim(config)
 
@@ -42,6 +44,8 @@ def test_device_sim_init():
 def test_device_sim_start_opens_host():
     with patch("ntfc.coreconfig.CoreConfig") as mockdevice:
         config = mockdevice.return_value
+        config.os = "nuttx"
+        config.read_poll_interval = 0.1
         config.elf_path = "/tmp/nuttx-sim"
         config.uptime = 3
         sim = DeviceSim(config)
@@ -63,6 +67,8 @@ def test_device_sim_start_opens_host():
 def test_device_sim_write_adds_newline():
     with patch("ntfc.coreconfig.CoreConfig") as mockdevice:
         config = mockdevice.return_value
+        config.os = "nuttx"
+        config.read_poll_interval = 0.1
         config.elf_path = "/tmp/nuttx-sim"
         sim = DeviceSim(config)
 
@@ -85,6 +91,8 @@ def test_device_sim_write_adds_newline():
 def test_device_sim_write_no_extra_newline():
     with patch("ntfc.coreconfig.CoreConfig") as mockdevice:
         config = mockdevice.return_value
+        config.os = "nuttx"
+        config.read_poll_interval = 0.1
         config.elf_path = "/tmp/nuttx-sim"
         sim = DeviceSim(config)
 

@@ -72,7 +72,7 @@ class DeviceCommon(ABC):
         )
         self.clear_fault_flags()
 
-        self._read_all_sleep = 0.1
+        self._read_all_sleep = conf.read_poll_interval
         self._has_echo = echo
         self._start_time: Optional[float] = None
         self._output_tail_buf = bytearray()
@@ -273,7 +273,7 @@ class DeviceCommon(ABC):
         ret = CmdStatus.TIMEOUT
 
         while True:
-            chunk = self._read_all(0.1)
+            chunk = self._read_all(self._read_all_sleep)
             output += chunk
             self._console_log(chunk)
 
