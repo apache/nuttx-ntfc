@@ -58,6 +58,10 @@ class DEnvironmentData:
     modules: Optional[List[str]] = None
     select_individual_tests: Optional[List[int]] = None
 
+    # usb suspend check
+    runusbsuspend: bool = False
+    usbsuspend: Optional[Any] = None
+
     # multi-session
     runmulti: bool = False
     manifest: Optional[str] = None

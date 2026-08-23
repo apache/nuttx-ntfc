@@ -25,7 +25,7 @@ import os
 import pprint
 import sys
 from collections.abc import Mapping
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 import yaml  # type: ignore
@@ -33,6 +33,7 @@ from prettytable import PrettyTable
 
 from ntfc.builder import BuilderConfigError, NuttXBuilder
 from ntfc.cli.environment import Environment, pass_environment
+from ntfc.lib.usb.suspend import UsbSuspendCheck, UsbSuspendError
 from ntfc.log.logger import logger
 from ntfc.multi import ManifestConfig, MultiSessionRunner
 from ntfc.plugins_loader import commands_list
@@ -340,6 +341,34 @@ def multi_run(ctx: Environment) -> int:
     return runner.run()
 
 
+def usbsuspend_run(ctx: Environment) -> int:
+    """Run the USB CDC/ACM suspend/resume check.
+
+    :param ctx: CLI environment carrying the check configuration.
+    :return: Exit code (0 = pass, 1 = fail, 2 = inconclusive).
+    """
+    assert ctx.usbsuspend is not None
+    try:
+        return UsbSuspendCheck(ctx.usbsuspend).run()
+    except UsbSuspendError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def standalone_run(ctx: Environment) -> Optional[int]:
+    """Run a mode that needs no NuttX configuration of its own.
+
+    :param ctx: CLI environment.
+    :return: Exit code, or None when no such mode was selected.
+    """
+    if ctx.runmulti:
+        return multi_run(ctx)
+
+    if ctx.runusbsuspend:
+        return usbsuspend_run(ctx)
+
+    return None
+
+
 @pass_environment
 def cli_on_close(ctx: Environment) -> bool:
     """Handle all work on Click close."""
@@ -347,9 +376,8 @@ def cli_on_close(ctx: Environment) -> bool:
         # do nothing if help was called
         return True
 
-    # multi-session mode
-    if ctx.runmulti:
-        ret = multi_run(ctx)
+    ret = standalone_run(ctx)
+    if ret is not None:
         if ret != 0:
             exit(1)
         return True

@@ -157,6 +157,61 @@ Options:
 
 * ``--flash / --no-flash``  Flash image. Default: True.
 
+``usb-suspend`` command
+-----------------------
+
+Check that a NuttX USB CDC/ACM link survives Linux USB runtime suspend.
+Implemented by :class:`ntfc.lib.usb.suspend.UsbSuspendCheck`.
+
+A device driver that reports ``CLASS_SUSPEND`` but never ``CLASS_RESUME``
+leaves ``cdcacm_suspend()``'s ``uart_connected(false)`` latched, after which
+every board-side ``open()`` and ``write()`` on the CDC port returns
+``-ENOTCONN``.  The device stays enumerated, so the failure reads as a random
+USB wedge.
+
+Each cycle forces a runtime suspend, resumes the device by opening the port,
+and counts bytes over the read window and over its tail.  The tail count is
+what separates a working link from one that only flushed its stale CDC TX
+buffer on resume.
+
+.. code-block:: bash
+
+   python -m ntfc usb-suspend [OPTIONS]
+
+Requires a Linux host, ``sudo`` for two sysfs power attributes, a closed port
+(an open port pins runtime PM, so the host never suspends), and a board that
+transmits unprompted.  Takes no ``--confpath``: nothing here needs a NuttX
+configuration.
+
+Options:
+
+* ``-d, --device PATH`` - CDC/ACM port of the board.
+  Default: autodetect, which requires exactly one CDC/ACM port.
+
+* ``-n, --cycles INTEGER`` - Suspend/resume cycles to run. Default: 5.
+
+* ``--delay-ms INTEGER`` - Autosuspend delay to force. Default: 1000.
+
+* ``--baud INTEGER`` - Baud rate of the CDC/ACM port. Default: 115200.
+
+* ``--read-secs FLOAT`` - Read window per cycle. Default: 2.0.
+
+* ``--tail-secs FLOAT`` - Trailing part of the window that must carry data.
+  Default: 1.0.
+
+* ``--min-bytes INTEGER`` - Bytes required in the tail window. Default: 2000.
+
+* ``--console PATH`` - Board console, on a separate port, used to ask the
+  board itself whether its CDC port is writable after resume.
+
+* ``--console-baud INTEGER`` - Baud rate of that console. Default: 115200.
+
+* ``--cdc-path PATH`` - CDC path as the board sees it.
+  Default: ``/dev/ttyACM0``.
+
+Exit codes: 0 the link recovered from every suspend, 1 it did not, 2 the host
+never suspended the device so nothing was exercised.
+
 Log Management
 ==============
 

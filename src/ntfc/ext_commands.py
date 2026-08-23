@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 from ntfc.commands.cmd_build import cmd_build
 from ntfc.commands.cmd_collect import cmd_collect
 from ntfc.commands.cmd_test import cmd_test
+from ntfc.commands.cmd_usbsuspend import cmd_usbsuspend
 
 if TYPE_CHECKING:
     import click
@@ -33,4 +34,5 @@ commands_list: list["click.Command"] = [
     cmd_build,
     cmd_collect,
     cmd_test,
+    cmd_usbsuspend,
 ]
