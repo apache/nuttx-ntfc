@@ -68,8 +68,8 @@ class PytestConfigPlugin:
         """Reboot the device with retry and exponential back-off.
 
         Uses recovery configuration from EnvConfig (max_retries,
-        base_delay, reboot_timeout).  Doubles the delay after each
-        failed attempt, capped at 60 seconds.
+        base_delay).  Doubles the delay after each failed attempt,
+        capped at 60 seconds.
         """
         recovery_cfg = self._config.recovery
         max_retries = recovery_cfg["max_retries"]

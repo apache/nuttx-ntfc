@@ -228,7 +228,6 @@ Remaining tests are skipped if all retries fail.
      recovery:
        max_retries: 3      # reboot attempts before skipping remaining tests
        base_delay: 2.0     # seconds between retries (doubles each attempt)
-       reboot_timeout: 30  # seconds to wait for device after reboot
 
 Signal Handlers
 ===============

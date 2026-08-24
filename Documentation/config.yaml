@@ -17,7 +17,6 @@ config:                           # common, global configuration options
   recovery:                       # device recovery configuration
     max_retries: 3                # maximum number of reboot attempts before giving up. Defaults to 3
     base_delay: 2.0               # initial delay in seconds between retries (doubles each attempt, capped at 60). Defaults to 2.0
-    reboot_timeout: 30            # timeout in seconds to wait for device to come back after reboot. Defaults to 30
 
 product:                          # many products can be supported in tests (product == product0)
 

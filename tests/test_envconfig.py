@@ -183,7 +183,6 @@ def test_envconfig_recovery_defaults():
     recovery = env.recovery
     assert recovery["max_retries"] == 3
     assert recovery["base_delay"] == 2.0
-    assert recovery["reboot_timeout"] == 30
 
 
 def test_envconfig_recovery_custom():
@@ -200,4 +199,3 @@ def test_envconfig_recovery_custom():
     recovery = env.recovery
     assert recovery["max_retries"] == 5
     assert recovery["base_delay"] == 1.0
-    assert recovery["reboot_timeout"] == 30  # default preserved

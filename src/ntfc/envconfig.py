@@ -103,13 +103,11 @@ class EnvConfig:
         """Return device recovery configuration.
 
         :return: Dictionary with keys: 'max_retries' (int),
-            'base_delay' (float), 'reboot_timeout' (int).
-            Defaults to 3 retries, 2s base delay, 30s reboot timeout.
+            'base_delay' (float). Defaults to 3 retries, 2s base delay.
         """
         default_config = {
             "max_retries": 3,
             "base_delay": 2.0,
-            "reboot_timeout": 30,
         }
         config = self._cfg_values.get("config", {})
         recovery_cfg = config.get("recovery", {})
