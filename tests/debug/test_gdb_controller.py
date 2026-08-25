@@ -76,6 +76,24 @@ def _pipe_process() -> Tuple[MagicMock, BinaryIO]:
     return proc, w_file
 
 
+def _respond_on_gcore(
+    proc: MagicMock, w_file: BinaryIO, response: bytes
+) -> None:
+    """Feed *response* into the pipe when the gcore marker echo is sent.
+
+    Replying only after GdbController has issued the command mirrors real
+    gdb and avoids racing generate_coredump()'s state reset: lines written
+    to the pipe before the call may be consumed by the reader thread and
+    then discarded by the reset, leaving the wait to time out.
+    """
+
+    def write(data: bytes) -> None:
+        if GdbController.GCORE_MARKER.encode() in data:
+            w_file.write(response)
+
+    proc.stdin.write.side_effect = write
+
+
 @pytest.fixture
 def elf(tmp_path: "Path") -> "Path":
     p = tmp_path / "app.elf"
@@ -468,8 +486,14 @@ class TestGdbControllerGenerateCoredump:
 
         assert start_ok is True
 
-        w_file.write(f"Saved corefile {corefile}\n".encode())
-        w_file.write(f"{GdbController.GCORE_MARKER}\n".encode())
+        _respond_on_gcore(
+            proc,
+            w_file,
+            (
+                f"Saved corefile {corefile}\n"
+                f"{GdbController.GCORE_MARKER}\n"
+            ).encode(),
+        )
         result = ctrl.generate_coredump(tmp_path, "test", timeout=5.0)
         # Close write end → EOF → reader exits; join to avoid ResourceWarning
         w_file.close()
@@ -489,8 +513,14 @@ class TestGdbControllerGenerateCoredump:
             w_file.write(b"(gdb) \n")
             ctrl.start(timeout=5.0)
 
-        w_file.write(b"Unable to fetch a corefile\n")
-        w_file.write(f"{GdbController.GCORE_MARKER}\n".encode())
+        _respond_on_gcore(
+            proc,
+            w_file,
+            (
+                "Unable to fetch a corefile\n"
+                f"{GdbController.GCORE_MARKER}\n"
+            ).encode(),
+        )
         result = ctrl.generate_coredump(tmp_path, "test", timeout=5.0)
         w_file.close()
         ctrl.stop()
@@ -553,7 +583,9 @@ class TestGdbControllerGenerateCoredump:
             ctrl = GdbController(elf, _cfg(gcore_cmd="gcore -t nuttx"))
             w_file.write(b"(gdb) \n")
             ctrl.start(timeout=5.0)
-        w_file.write(f"{GdbController.GCORE_MARKER}\n".encode())
+        _respond_on_gcore(
+            proc, w_file, f"{GdbController.GCORE_MARKER}\n".encode()
+        )
         ctrl.generate_coredump(tmp_path, "t", timeout=5.0)
         w_file.close()
         ctrl.stop()
