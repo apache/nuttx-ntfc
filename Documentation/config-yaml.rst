@@ -126,7 +126,8 @@ for serial targets without flow control and remains the default.
 
 Set ``line_buffered: true`` for a core to write a complete command in one
 transport operation instead. This reduces host-side overhead for ``sim`` and
-can also be enabled for serial targets with reliable flow control.
+``qemu`` and can also be enabled for serial targets with reliable flow
+control.
 
 .. code-block:: yaml
 
@@ -138,9 +139,12 @@ can also be enabled for serial targets with reliable flow control.
          device: "sim"
          line_buffered: true
 
-For the simulator, line-buffered mode also disables the pexpect per-send
-delay. Do not enable this option for serial targets that cannot
-reliably accept a full command at once.
+For host-based devices (``sim`` and ``qemu``), line-buffered mode also
+disables the pexpect per-send delay. Do not enable this option for serial
+targets that cannot reliably accept a full command at once.
+
+The target serial RX buffer must hold a whole command line, otherwise the
+tail of long commands is dropped and they time out.
 
 **SMP (Symmetric Multi-Processing)**
 

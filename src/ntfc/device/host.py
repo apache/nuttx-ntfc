@@ -43,6 +43,9 @@ if TYPE_CHECKING:
 class DeviceHost(DeviceCommon):
     """This class implements common interface for host emulated devices."""
 
+    # appended when a command lacks a trailing newline
+    NEWLINE_PAD = b"\n"
+
     def __init__(self, conf: "CoreConfig"):
         """Initialize host based device.
 
@@ -76,6 +79,24 @@ class DeviceHost(DeviceCommon):
         self._stop_impl()
 
         return self.host_open(self._cmd)
+
+    def _write(self, data: bytes) -> None:
+        """Write to the host device."""
+        if not self.dev_is_health():
+            return
+
+        assert self._child
+
+        if data[-1] != ord("\n"):
+            data += self.NEWLINE_PAD
+
+        if self._conf.line_buffered:
+            self._child.send(data)
+            return
+
+        # send char by char to avoid line length full
+        for c in data:
+            self._child.send(bytes([c]))
 
     def _write_ctrl(self, c: str) -> None:
         """Write a control character to the host device."""

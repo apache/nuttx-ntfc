@@ -25,6 +25,60 @@ import pytest
 from ntfc.device.qemu import DeviceQemu
 
 
+def test_device_qemu_write_adds_newline():
+    with patch("ntfc.coreconfig.CoreConfig") as mockdevice:
+        config = mockdevice.return_value
+        config.os = "nuttx"
+        config.read_poll_interval = 0.1
+        config.line_buffered = False
+        qemu = DeviceQemu(config)
+
+        sent = []
+
+        class FakeChild:
+            def isalive(self):
+                return True
+
+            def send(self, data):
+                sent.append(data)
+
+        qemu._child = FakeChild()
+
+        qemu._write(b"abc")
+        assert sent == [b"a", b"b", b"c", b"\n"]
+
+        sent.clear()
+        qemu._write(b"abc\n")
+        assert sent == [b"a", b"b", b"c", b"\n"]
+
+
+def test_device_qemu_line_buffered_write():
+    with patch("ntfc.coreconfig.CoreConfig") as mockdevice:
+        config = mockdevice.return_value
+        config.os = "nuttx"
+        config.read_poll_interval = 0.1
+        config.line_buffered = True
+        qemu = DeviceQemu(config)
+
+        sent = []
+
+        class FakeChild:
+            def isalive(self):
+                return True
+
+            def send(self, data):
+                sent.append(data)
+
+        qemu._child = FakeChild()
+
+        qemu._write(b"abc")
+        assert sent == [b"abc\n"]
+
+        sent.clear()
+        qemu._write(b"abc\n")
+        assert sent == [b"abc\n"]
+
+
 def test_device_qemu_open():
 
     with patch("ntfc.coreconfig.CoreConfig") as mockdevice:

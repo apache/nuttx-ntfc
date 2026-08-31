@@ -80,18 +80,3 @@ class DeviceQemu(DeviceHost):
     def name(self) -> str:
         """Get device name."""
         return "qemu"
-
-    def _write(self, data: bytes) -> None:  # pragma: no cover
-        """Write to the host device."""
-        if not self.dev_is_health():
-            return
-
-        assert self._child
-
-        # send char by char to avoid line length full
-        for c in data:
-            self._child.send(bytes([c]))
-
-        # add new line if missing
-        if data[-1] != ord("\n"):
-            self._child.send(b"\n")

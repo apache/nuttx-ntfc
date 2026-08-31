@@ -35,6 +35,9 @@ if TYPE_CHECKING:
 class DeviceSim(DeviceHost):
     """This class implements host-based sim emulator."""
 
+    # sometimes sim misses a single trailing newline, so send two
+    NEWLINE_PAD = b"\n\n"
+
     def __init__(self, conf: "CoreConfig"):
         """Initialize sim emulator device."""
         DeviceHost.__init__(self, conf)
@@ -55,29 +58,3 @@ class DeviceSim(DeviceHost):
     def name(self) -> str:
         """Get device name."""
         return "sim"
-
-    def _write(self, data: bytes) -> None:
-        """Write to the host device."""
-        if not self.dev_is_health():
-            return
-
-        assert self._child
-
-        if self._conf.line_buffered:
-            if data[-1] != ord("\n"):
-                # Sometimes sim misses a single trailing newline.
-                data += b"\n\n"
-
-            self._child.send(data)
-            return
-
-        # send char by char to avoid line length full
-        for c in data:
-            self._child.send(bytes([c]))
-
-        # add new line if missing
-        if data[-1] != ord("\n"):
-            # sometimes new line send to sim is missing
-            # so we have to send more than one new line
-            self._child.send(b"\n")
-            self._child.send(b"\n")

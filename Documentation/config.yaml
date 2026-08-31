@@ -91,6 +91,7 @@ product:                          # many products can be supported in tests (pro
       line_buffered: false        # (optional) send each command in one transport write.
                                   # Keep false for the default byte-wise behavior.
                                   # Enable for sim or a serial transport with flow control.
+                                  # Target serial RX buffer must hold a whole command line.
       dcmake:                     # (optional) Defines passed to CMake build
         DEFINE1: "VALUE1"
         DEFINE2: "VALUE2"
