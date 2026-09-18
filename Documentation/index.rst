@@ -14,6 +14,7 @@ for NuttX.
    writing-test-cases
    config-yaml
    multi-session
+   fuzzing
    session-json
    debug/index
    report

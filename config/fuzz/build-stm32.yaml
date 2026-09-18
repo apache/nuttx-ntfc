@@ -1,0 +1,28 @@
+# Build-break sweep: toggle each STM32 peripheral option of the chip (scope
+# 'arch') on top of the base config and try to compile it. 'mock: true'
+# synthesizes missing board constants (GPIO_*, DMAMAP_*, ...) so peripheral
+# drivers compile without board glue, separating real build breaks from
+# missing-board-config noise.
+#
+# build only compiles, so ONE config (this fuzz config) is enough -- it names
+# the board and the tree to build.
+#
+#   ntfc fuzz --campaign config/fuzz/build-stm32.yaml --list      # surface
+#   ntfc fuzz --campaign config/fuzz/build-stm32.yaml --dry-run   # matrix
+#   ntfc fuzz --campaign config/fuzz/build-stm32.yaml             # sweep
+#
+# 'limit' keeps the demo bounded (first N of the sweep); drop it to sweep the
+# whole surface (~70 candidates on this board).
+feature: build
+arch: stm32
+board: nucleo-h563zi:nsh   # board:config to fuzz
+tree: ./external           # dir containing nuttx/ and apps/
+surface:
+  scope: [arch]
+strategy:
+  mode: single             # one candidate per option
+  limit: 10
+mock: true
+parallel: true
+workers: 4
+jobs: 4

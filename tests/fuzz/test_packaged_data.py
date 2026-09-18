@@ -18,21 +18,11 @@
 #
 ############################################################################
 
-"""Default commands."""
+from ntfc.fuzz import dataload
 
-from typing import TYPE_CHECKING
 
-from ntfc.commands.cmd_build import cmd_build
-from ntfc.commands.cmd_collect import cmd_collect
-from ntfc.commands.cmd_fuzz import cmd_fuzz
-from ntfc.commands.cmd_test import cmd_test
-
-if TYPE_CHECKING:
-    import click
-
-commands_list: list["click.Command"] = [
-    cmd_build,
-    cmd_collect,
-    cmd_test,
-    cmd_fuzz,
-]
+def test_packaged_data_dir_resolves():
+    assert (dataload.DATA_DIR / "arch-profiles.yaml").exists()
+    assert (dataload.DATA_DIR / "scopes.yaml").exists()
+    assert (dataload.DATA_DIR / "patterns.yaml").exists()
+    assert "stm32" in dataload.load_profiles()

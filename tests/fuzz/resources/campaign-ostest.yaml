@@ -1,0 +1,13 @@
+feature: ostest
+arch: stm32
+surface:
+  symbols: [BAD, HARMLESS_A, HARMLESS_B]
+strategy:
+  mode: random
+  rounds: 6
+  size: 3
+  seed: 1
+  minimize: true
+timeout: 60
+workers: 2
+jobs: 4

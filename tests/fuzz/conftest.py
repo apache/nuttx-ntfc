@@ -18,21 +18,18 @@
 #
 ############################################################################
 
-"""Default commands."""
+import pytest
 
-from typing import TYPE_CHECKING
 
-from ntfc.commands.cmd_build import cmd_build
-from ntfc.commands.cmd_collect import cmd_collect
-from ntfc.commands.cmd_fuzz import cmd_fuzz
-from ntfc.commands.cmd_test import cmd_test
+@pytest.fixture(autouse=True)
+def _isolated_build_root(tmp_path, monkeypatch):
+    """Keep engine tests away from the repo's real ./build directory.
 
-if TYPE_CHECKING:
-    import click
-
-commands_list: list["click.Command"] = [
-    cmd_build,
-    cmd_collect,
-    cmd_test,
-    cmd_fuzz,
-]
+    The engines rmtree their per-candidate build dirs; without this, a test
+    run would delete directories of a real fuzz sweep happening in the same
+    checkout (the campaign resources use the default ``./build``).
+    """
+    monkeypatch.setattr(
+        "ntfc.fuzz.engine._build_root",
+        lambda build_dir: str(tmp_path / "fuzz"),
+    )

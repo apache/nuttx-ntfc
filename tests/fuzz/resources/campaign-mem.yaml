@@ -1,0 +1,10 @@
+feature: mem
+arch: stm32
+board: sim:ntfc
+tree: ./external
+surface:
+  symbols: [FS_FAT, CRYPTO]
+strategy:
+  mode: marginal
+workers: 2
+jobs: 4

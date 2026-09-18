@@ -18,21 +18,23 @@
 #
 ############################################################################
 
-"""Default commands."""
+"""Data model shared across the fuzz modules."""
 
-from typing import TYPE_CHECKING
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List
 
-from ntfc.commands.cmd_build import cmd_build
-from ntfc.commands.cmd_collect import cmd_collect
-from ntfc.commands.cmd_fuzz import cmd_fuzz
-from ntfc.commands.cmd_test import cmd_test
 
-if TYPE_CHECKING:
-    import click
+@dataclass
+class SymbolInfo:
+    """A fuzzable Kconfig symbol discovered for a base configuration."""
 
-commands_list: list["click.Command"] = [
-    cmd_build,
-    cmd_collect,
-    cmd_test,
-    cmd_fuzz,
-]
+    name: str  # symbol name without the CONFIG_ prefix
+    kind: str  # "bool" (only bool is fuzzed in this version)
+    cur_value: str  # value in the expanded base config ("n", "y", ...)
+    target: str  # value the candidate sets it to ("y")
+    files: List[str] = field(default_factory=list)  # defining Kconfig files
+    in_choice: bool = False  # member of a choice block
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return the symbol as a plain dictionary."""
+        return asdict(self)

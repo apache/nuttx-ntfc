@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Classification regex tables. Editable without touching code.
+# - board_required : unmet board/platform prerequisites (not code bugs).
+# - config_required: Kconfig dependency problems (fixable with select).
+# - build_error    : lines pulled as the "error excerpt" from a build log.
+# - ostest_exit    : capture group 1 is the ostest exit status.
+# - crash          : any match means an assertion/panic/segfault occurred.
+
+board_required:
+  - 'must be defined'
+  - 'in board\.h'
+  - 'board\.h needs to define'
+  - 'Must define .* in'
+  - 'memory manager regions'
+  - 'CONFIG_MM_REGIONS'
+  - "undefined reference to `(?:board_|up_|host_|sim_)\\w+'"
+
+config_required:
+  - 'requires CONFIG_\w+'
+  - 'CONFIG_\w+ (?:is required|must be (?:set|selected|enabled|defined))'
+  - '#error[^\n]*\brequires\b'
+  - '#error[^\n]*\bmust be (?:set|selected|enabled)\b'
+
+build_error:
+  - 'error:'
+  - 'fatal error:'
+  - 'undefined reference'
+  - 'No such file or directory'
+  - 'Error \d'
+  - 'CMake Error'
+  - 'ninja: error'
+  - 'recipe for target'
+
+ostest_exit: 'ostest_main: Exiting with status (-?\d+)'
+
+crash: 'assert|panic|Assertion failed|up_assert|Segmentation|Backtrace'

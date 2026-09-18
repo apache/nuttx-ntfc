@@ -30,6 +30,7 @@ requires-python = ">=3.10"
 dependencies = [
          "click>=8.1",
          "pyyaml",
+         "kconfiglib", # Kconfig parsing for the fuzz feature
          "pyelftools",
          "pexpect",
          "psutil",
@@ -62,7 +63,7 @@ coredump = [
 ntfc = "ntfc.cli.main:main"
 
 [tool.setuptools.package-data]
-ntfc = ["log.yaml", "log/templates/*.html"]
+ntfc = ["log.yaml", "log/templates/*.html", "fuzz/data/*.yaml"]
 
 [tool.black]
 line-length = 79

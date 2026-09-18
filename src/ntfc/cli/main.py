@@ -340,8 +340,120 @@ def multi_run(ctx: Environment) -> int:
     return runner.run()
 
 
+def _fuzz_check_tree(cwd: Any, where: str) -> bool:  # pragma: no cover
+    """Verify a tree dir contains nuttx/ and apps/; print guidance if not."""
+    from pathlib import Path
+
+    cwd = Path(cwd)
+    if (cwd / "nuttx").is_dir() and (cwd / "apps").is_dir():
+        return True
+    print(
+        f"[fuzz] ERROR: {where} '{cwd}' must contain both nuttx/ and apps/ "
+        f"checkouts (nuttx/ present: {(cwd / 'nuttx').is_dir()}, apps/ "
+        f"present: {(cwd / 'apps').is_dir()}). Nothing was built."
+    )
+    return False
+
+
+def fuzz_run(ctx: Environment) -> int:  # pragma: no cover  # noqa: C901
+    """Run a fuzz config and write its report into a session directory.
+
+    ``build`` / ``mem`` need only the fuzz config (it names board + tree).
+    ``ostest`` also needs an NTFC target config via ``--confpath``.
+    """
+    from pathlib import Path
+
+    from ntfc.fuzz import dataload, discover
+    from ntfc.fuzz.campaign import (
+        CampaignError,
+        board_config_of,
+        load_fuzz_config,
+    )
+    from ntfc.fuzz.engine import (
+        _label,
+        _surface_names,
+        plan_candidates,
+        run_campaign,
+    )
+    from ntfc.log.manager import LogManager
+
+    assert ctx.fuzzpath is not None
+    try:
+        fuzz = load_fuzz_config(ctx.fuzzpath)
+    except CampaignError as exc:
+        print(f"[fuzz] ERROR: {exc}")
+        return 2
+
+    # The ostest candidate matrix comes from the fuzz config alone, so a
+    # --dry-run does not need the target config.
+    target = None
+    cwd = None
+    board = "(target from --confpath)"
+    nuttx_root = Path(".")
+    if fuzz.needs_target:
+        if ctx.fuzz_confpath:
+            with open(ctx.fuzz_confpath, "r", encoding="utf-8") as f:
+                target = yaml.safe_load(f)
+            cwd = Path(target["config"]["cwd"]).resolve()
+            target["config"]["cwd"] = str(cwd)
+            board = board_config_of(target)
+            nuttx_root = cwd / "nuttx"
+        elif not ctx.fuzz_dry_run:
+            print(
+                "[fuzz] ERROR: the 'ostest' feature needs a target config: "
+                "pass --confpath <ntfc-config.yaml> (device/board)."
+            )
+            return 2
+    else:
+        cwd = Path(str(fuzz.tree)).resolve()
+        fuzz.tree = str(cwd)
+        fuzz.build_dir = str(Path(fuzz.build_dir).resolve())
+        board = str(fuzz.board)
+        nuttx_root = cwd / "nuttx"
+
+    if cwd is not None and not _fuzz_check_tree(cwd, "the tree"):
+        return 2
+
+    if ctx.fuzz_list:
+        profile = dataload.get_profile(fuzz.arch)
+        names = _surface_names(
+            fuzz, nuttx_root, profile, board, discover.discover
+        )
+        print(f"fuzz surface for {board}:")
+        for n in names:
+            print(f"  {n}")
+        return 0
+
+    if ctx.fuzz_dry_run:
+        subsets = plan_candidates(fuzz, target)
+        print(
+            f"[fuzz] planned {fuzz.feature} candidates for {board}: "
+            f"{len(subsets)}"
+        )
+        for s in subsets:
+            print(f"  {_label(s)}")
+        return 0
+
+    def _progress(msg: str) -> None:
+        print(msg, flush=True)
+
+    print(
+        f"[fuzz] starting {fuzz.feature} campaign on {board} ...", flush=True
+    )
+    report = run_campaign(fuzz, target, progress=_progress)
+
+    log_manager = LogManager(ctx.result.get("logcfg") if ctx.result else None)
+    log_manager.cleanup()
+    session_dir = log_manager.new_session_dir()
+    report.write(session_dir)
+
+    print(report.text())
+    print(f"\n[fuzz] report written to {session_dir}")
+    return 1 if report.failed() else 0
+
+
 @pass_environment
-def cli_on_close(ctx: Environment) -> bool:
+def cli_on_close(ctx: Environment) -> bool:  # noqa: C901
     """Handle all work on Click close."""
     if ctx.helpnow:  # pragma: no cover
         # do nothing if help was called
@@ -350,6 +462,13 @@ def cli_on_close(ctx: Environment) -> bool:
     # multi-session mode
     if ctx.runmulti:
         ret = multi_run(ctx)
+        if ret != 0:
+            exit(1)
+        return True
+
+    # fuzzing mode
+    if ctx.runfuzz:
+        ret = fuzz_run(ctx)
         if ret != 0:
             exit(1)
         return True

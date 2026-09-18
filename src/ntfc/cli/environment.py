@@ -62,6 +62,13 @@ class DEnvironmentData:
     runmulti: bool = False
     manifest: Optional[str] = None
 
+    # fuzzing
+    runfuzz: bool = False
+    fuzzpath: Optional[str] = None
+    fuzz_confpath: Optional[str] = None
+    fuzz_list: bool = False
+    fuzz_dry_run: bool = False
+
     # files
     testpath: Optional[str] = None
     confpath: Optional[str] = None

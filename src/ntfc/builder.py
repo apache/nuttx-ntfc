@@ -24,15 +24,26 @@ import os
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from ntfc.log.logger import logger
 
 
 class BuilderConfigError(ValueError):
     """Invalid build configuration in YAML."""
+
+
+@dataclass
+class CandidateBuild:
+    """Result of an ephemeral fuzz-candidate build."""
+
+    ok: bool
+    log: str
+    elf_path: str
+    conf_path: str
 
 
 class NuttXBuilder:
@@ -276,6 +287,12 @@ class NuttXBuilder:
         for key, value in overrides.items():
             if key not in replaced:
                 updated_lines.append(self._format_kconfig_line(key, value))
+
+        # Skip identical rewrites: touching .config forces the build to
+        # regenerate config.h, which discards constants the fuzzer's mock
+        # mode injected there between build retries.
+        if updated_lines == lines:
+            return
 
         with open(conf_path, "w", encoding="utf-8") as f:
             f.writelines(updated_lines)
@@ -564,6 +581,82 @@ class NuttXBuilder:
 
             logger.info(f"flash image cmd: {cmd}")
             self._run_command(cmd, env=None)
+
+    def _run_capture(
+        self, cmd: List[str], env: Optional[Dict[str, str]] = None
+    ) -> Tuple[int, str]:  # pragma: no cover
+        """Run a command, capturing output; never raises on non-zero."""
+        run_env = os.environ.copy()
+        if env:
+            run_env.update(env)
+        proc = subprocess.run(cmd, env=run_env, text=True, capture_output=True)
+        return proc.returncode, proc.stdout + proc.stderr
+
+    def build_candidate(
+        self,
+        board_config: str,
+        kv: Dict[str, Any],
+        build_dir: str,
+        jobs: Optional[int] = None,
+        build_env: Optional[Dict[str, str]] = None,
+        configure: bool = True,
+    ) -> "CandidateBuild":
+        """Build one fuzz candidate into a unique dir, capturing failures.
+
+        A candidate is the base board's defconfig plus the ``kv`` Kconfig
+        overrides (the fuzz toggles), applied to the generated ``.config``
+        before the build. Nothing in the source tree is modified. Unlike
+        :meth:`build_all`, a build failure is captured and returned rather than
+        raised, so a sweep can classify it.
+
+        ``configure=False`` compiles the existing build dir as-is (no cmake
+        configure, no override re-apply, no config re-expansion). The fuzzer's
+        mock retries need this: reconfiguring regenerates ``config.h`` and
+        would discard the mock constants injected there.
+        """
+        cfg_cwd = self._cfg_values["config"]["cwd"]
+        nuttx_dir = os.path.join(cfg_cwd, "nuttx")
+        elf_path = os.path.join(build_dir, "nuttx")
+        conf_path = os.path.join(build_dir, ".config")
+        log = ""
+
+        if configure:
+            self._make_dir(Path(build_dir))
+            cfg_cmd = [
+                "cmake",
+                f"-B{build_dir}",
+                f"-S{nuttx_dir}",
+                "-GNinja",
+                f"-DBOARD_CONFIG={board_config}",
+            ]
+            rc, log = self._run_capture(cfg_cmd, build_env)
+            if rc != 0:
+                return CandidateBuild(False, log, elf_path, conf_path)
+
+            # reuse the existing .config override machinery (no source
+            # touched); called without cfg_cwd so it edits .config directly
+            # (no tweak tool)
+            self._apply_kconfig_overrides(conf_path, kv)
+
+            if kv:
+                # Re-expand the edited .config (as 'make olddefconfig'):
+                # options unlocked by the overrides need their defaults
+                # materialized, or dependent int/hex symbols are missing from
+                # config.h and the enabled code fails with 'undeclared'
+                # errors.
+                rc, olog = self._run_capture(
+                    ["cmake", "--build", build_dir, "-t", "olddefconfig"],
+                    build_env,
+                )
+                log += olog
+                if rc != 0:
+                    return CandidateBuild(False, log, elf_path, conf_path)
+
+        build_cmd = ["cmake", "--build", build_dir]
+        if jobs:
+            build_cmd += ["--", f"-j{jobs}"]
+        rc, blog = self._run_capture(build_cmd, build_env)
+        return CandidateBuild(rc == 0, log + blog, elf_path, conf_path)
 
     def need_build(self) -> bool:
         """Check if we need build something."""

@@ -1,0 +1,27 @@
+# ostest sweep: build random combinations of the listed options, boot each
+# one, run ostest over the device layer, and delta-debug any runtime failure
+# down to a minimal failing option set. All three symbols are off in sim:nsh,
+# so every candidate exercises a genuinely different kernel configuration.
+#
+# ostest boots a real target, so it needs TWO configs:
+#   1. this fuzz config (what to fuzz)
+#   2. an NTFC target config passed with --confpath (device/board/run params)
+#
+#   ntfc fuzz --campaign config/fuzz/ostest-sim.yaml --dry-run   # matrix
+#   ntfc fuzz --campaign config/fuzz/ostest-sim.yaml \
+#             --confpath config/nuttx-sim-nsh.yaml              # sweep
+#
+# The target is a normal NTFC config, so swap it for a QEMU or serial target
+# (device: qemu / serial) to fuzz ostest on emulation or real hardware.
+feature: ostest
+arch: sim
+surface:
+  symbols: [SCHED_LPWORK, PRIORITY_INHERITANCE, MM_KERNEL_HEAP]
+strategy:
+  mode: random
+  rounds: 4
+  size: 3
+  seed: 8                  # this seed yields 4 distinct subsets
+  minimize: true
+timeout: 600
+jobs: 4

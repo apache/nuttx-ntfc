@@ -19,6 +19,7 @@
 ############################################################################
 
 import copy
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -586,6 +587,20 @@ def test_builder_apply_kconfig_overrides() -> None:
         assert "# CONFIG_OFF is not set\n" in cfg_text
         assert "CONFIG_KEEP=y\n" in cfg_text
 
+        # an identical re-apply must not rewrite the file (an mtime bump
+        # would force a config.h regeneration that wipes injected mocks)
+        mtime = os.stat(cfg_path).st_mtime_ns
+        b._apply_kconfig_overrides(
+            str(cfg_path),
+            {
+                "CONFIG_REPLACE": "newval",
+                "CONFIG_DISABLE_ME": "y",
+                "CONFIG_APPEND": "0x10",
+                "CONFIG_OFF": False,
+            },
+        )
+        assert os.stat(cfg_path).st_mtime_ns == mtime
+
         missing_path = Path(tmpdir) / "missing.config"
         b._apply_kconfig_overrides(str(missing_path), {"CONFIG_X": "y"})
 
@@ -761,3 +776,139 @@ def test_builder_flash_supports_elf_placeholder(tmp_path) -> None:
     builder._flash_core("core0", {"core0": core})
 
     assert commands == [["pxe-stage", str(image)]]
+
+
+def test_build_candidate_captures_failure(tmp_path):
+    from ntfc.builder import CandidateBuild
+
+    conf = copy.deepcopy(conf_dir)
+    conf["config"]["cwd"] = str(tmp_path)
+    conf["config"]["build_dir"] = str(tmp_path / "build")
+    b = NuttXBuilder(conf)
+
+    def fake_capture(cmd, env=None):
+        if "olddefconfig" in cmd:
+            return 0, "expanded"
+        if "--build" in cmd:
+            return 1, "ninja: error: boom"
+        return 0, "configured"
+
+    with (
+        patch.object(b, "_run_capture", side_effect=fake_capture),
+        patch.object(b, "_apply_kconfig_overrides"),
+    ):
+        res = b.build_candidate(
+            "sim:ntfc",
+            {"CONFIG_FOO": True},
+            build_dir=str(tmp_path / "build" / "cand0"),
+        )
+
+    assert isinstance(res, CandidateBuild)
+    assert res.ok is False
+    assert "expanded" in res.log
+    assert "boom" in res.log
+    assert res.elf_path.endswith("/nuttx")
+
+
+def test_build_candidate_no_configure_compiles_as_is(tmp_path):
+    conf = copy.deepcopy(conf_dir)
+    conf["config"]["cwd"] = str(tmp_path)
+    conf["config"]["build_dir"] = str(tmp_path / "build")
+    b = NuttXBuilder(conf)
+
+    calls = []
+
+    def fake_capture(cmd, env=None):
+        calls.append(cmd)
+        return 0, "built"
+
+    with (
+        patch.object(b, "_run_capture", side_effect=fake_capture),
+        patch.object(b, "_apply_kconfig_overrides") as ovr,
+    ):
+        res = b.build_candidate(
+            "sim:ntfc",
+            {"CONFIG_FOO": True},
+            build_dir=str(tmp_path / "build" / "cand4"),
+            configure=False,
+        )
+
+    assert res.ok is True
+    assert len(calls) == 1  # only the compile step
+    assert calls[0][:2] == ["cmake", "--build"]
+    ovr.assert_not_called()
+
+
+def test_build_candidate_olddefconfig_failure_skips_build(tmp_path):
+    conf = copy.deepcopy(conf_dir)
+    conf["config"]["cwd"] = str(tmp_path)
+    conf["config"]["build_dir"] = str(tmp_path / "build")
+    b = NuttXBuilder(conf)
+
+    calls = []
+
+    def fake_capture(cmd, env=None):
+        calls.append(cmd)
+        if "olddefconfig" in cmd:
+            return 1, "olddefconfig: boom"
+        return 0, "configured"
+
+    with (
+        patch.object(b, "_run_capture", side_effect=fake_capture),
+        patch.object(b, "_apply_kconfig_overrides"),
+    ):
+        res = b.build_candidate(
+            "sim:ntfc",
+            {"CONFIG_FOO": True},
+            build_dir=str(tmp_path / "build" / "cand3"),
+        )
+
+    assert res.ok is False
+    assert "olddefconfig: boom" in res.log
+    assert len(calls) == 2  # configure + olddefconfig; build never reached
+
+
+def test_build_candidate_configure_failure_skips_build(tmp_path):
+    conf = copy.deepcopy(conf_dir)
+    conf["config"]["cwd"] = str(tmp_path)
+    conf["config"]["build_dir"] = str(tmp_path / "build")
+    b = NuttXBuilder(conf)
+
+    calls = []
+
+    def fake_capture(cmd, env=None):
+        calls.append(cmd)
+        return 1, "cmake configure failed"
+
+    with (
+        patch.object(b, "_run_capture", side_effect=fake_capture),
+        patch.object(b, "_apply_kconfig_overrides") as ovr,
+    ):
+        res = b.build_candidate(
+            "sim:ntfc", {}, build_dir=str(tmp_path / "build" / "cand2")
+        )
+
+    assert res.ok is False
+    assert len(calls) == 1  # build step never reached
+    ovr.assert_not_called()
+
+
+def test_build_candidate_success(tmp_path):
+    conf = copy.deepcopy(conf_dir)
+    conf["config"]["cwd"] = str(tmp_path)
+    conf["config"]["build_dir"] = str(tmp_path / "build")
+    b = NuttXBuilder(conf)
+
+    with (
+        patch.object(b, "_run_capture", return_value=(0, "ok")),
+        patch.object(b, "_apply_kconfig_overrides"),
+    ):
+        res = b.build_candidate(
+            "sim:ntfc",
+            {},
+            build_dir=str(tmp_path / "build" / "cand1"),
+            jobs=4,
+        )
+    assert res.ok is True
+    assert res.elf_path.endswith("/nuttx")
+    assert res.conf_path.endswith("/.config")

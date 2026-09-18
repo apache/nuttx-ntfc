@@ -1,0 +1,17 @@
+# Memory footprint report: build the baseline and each variant, then diff the
+# flash/RAM footprint of every option against the baseline. All three symbols
+# are off in sim:nsh, so each one produces a real, non-zero delta.
+#
+# mem only compiles + sizes the ELF, so ONE config is enough.
+#
+#   ntfc fuzz --campaign config/fuzz/mem-sim.yaml --dry-run   # matrix
+#   ntfc fuzz --campaign config/fuzz/mem-sim.yaml             # sweep
+feature: mem
+arch: sim
+board: sim:nsh
+tree: ./external
+surface:
+  symbols: [CRYPTO, FS_TMPFS, LIBC_FLOATINGPOINT]
+strategy:
+  mode: marginal           # each symbol alone + all together
+jobs: 4

@@ -1,0 +1,13 @@
+# Simulator target booting the nsh defconfig (with the ostest builtin).
+# 'cwd' must contain nuttx/ and apps/. Used e.g. as the ostest fuzzing target:
+#   ntfc fuzz --campaign config/fuzz/ostest-sim.yaml --confpath <this file>
+config:
+  cwd: './external'
+  build_dir: './build'
+product:
+  name: "sim-nsh"
+  cores:
+    core0:
+      name: 'main'
+      device: 'sim'
+      defconfig: 'boards/sim/sim/sim/configs/nsh'

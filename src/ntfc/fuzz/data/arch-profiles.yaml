@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Arch profiles: which Kconfig symbols form each arch's fuzz surface, which are
+# never toggled, which build-error identifiers are board-supplied (mockable),
+# and which failures are board-config requirements (not code bugs).
+# Add a new arch by adding an entry here - no code change required.
+
+stm32:
+  # A symbol is in this arch's surface when its defining Kconfig file matches:
+  symbol_path: 'arch/arm/src/(common/stm32|stm32[^/]*)/'
+  # Never toggled: capability flags, chip selectors, chip-determined variants.
+  skip_prefixes: ['STM32_HAVE', 'ARCH_CHIP', 'STM32_FLASH_CONFIG_']
+  # Board-supplied constants (mockable in --mock mode):
+  mockable_prefixes:
+    ['GPIO_', 'BOARD_', 'DMAMAP_', 'DMACHAN_', 'SDIO_', 'STM32_RCC_']
+  mockable_suffixes: ['_CLKIN', '_FREQUENCY']
+  # Arch-specific board-config-requirement patterns (merged with generic set):
+  extra_board_required:
+    - 'selected HSI48 as USB clock'
+    - "undefined reference to `(stm32_board_clockconfig|stm32_phy_boardinitialize|mmcsd_slotinitialize|arm_usbinitialize|stm32_spidev_initialize)'"
+
+sim:
+  # The POSIX simulator: everything is host-compiled, there are no
+  # board-provided constants to mock.
+  symbol_path: 'arch/sim/'
+  skip_prefixes: ['ARCH_CHIP', 'HOST_']
+  mockable_prefixes: []

@@ -18,21 +18,13 @@
 #
 ############################################################################
 
-"""Default commands."""
+from ntfc.fuzz.model import SymbolInfo
 
-from typing import TYPE_CHECKING
 
-from ntfc.commands.cmd_build import cmd_build
-from ntfc.commands.cmd_collect import cmd_collect
-from ntfc.commands.cmd_fuzz import cmd_fuzz
-from ntfc.commands.cmd_test import cmd_test
-
-if TYPE_CHECKING:
-    import click
-
-commands_list: list["click.Command"] = [
-    cmd_build,
-    cmd_collect,
-    cmd_test,
-    cmd_fuzz,
-]
+def test_symbolinfo_to_dict():
+    s = SymbolInfo("STM32_ADC2", "bool", "n", "y", ["a/Kconfig"], False)
+    d = s.to_dict()
+    assert d["name"] == "STM32_ADC2"
+    assert d["kind"] == "bool"
+    assert d["files"] == ["a/Kconfig"]
+    assert d["in_choice"] is False

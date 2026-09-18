@@ -1,0 +1,13 @@
+feature: build
+arch: stm32
+board: sim:ntfc
+tree: ./external
+surface:
+  scope: [can]
+  include_choices: false
+strategy:
+  mode: single
+mock: true
+parallel: true
+workers: 2
+jobs: 4

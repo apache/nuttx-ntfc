@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Fuzz scopes: subsystem name -> regex matched against a symbol's defining
+# Kconfig file path (top-relative). Orthogonal to the arch profile (which only
+# decides how candidates are built/mocked). Add a line to add a subsystem.
+
+sched:    '(?:^|/)sched/'
+mm:       '(?:^|/)mm/'
+fs:       '(?:^|/)fs/'
+net:      '(?:^|/)net/'
+binfmt:   '(?:^|/)binfmt/'
+crypto:   '(?:^|/)crypto/'
+syscall:  '(?:^|/)syscall/'
+openamp:  '(?:^|/)openamp/'
+audio:    '(?:^|/)(?:audio|drivers/audio)/'
+graphics: '(?:^|/)(?:graphics|drivers/lcd|drivers/video)/'
+video:    '(?:^|/)(?:video|drivers/video)/'
+drivers:  '(?:^|/)drivers/'
+usb:      '(?:^|/)drivers/usb(?:dev|host|misc|monitor)/'
+sensors:  '(?:^|/)drivers/sensors/'
+power:    '(?:^|/)drivers/power/'
+mtd:      '(?:^|/)drivers/mtd/'
+input:    '(?:^|/)drivers/input/'
+serial:   '(?:^|/)drivers/serial/'
+can:      '(?:^|/)drivers/can/'
+motor:    '(?:^|/)drivers/motor/'
+timers:   '(?:^|/)drivers/timers/'
+wireless: '(?:^|/)(?:wireless|drivers/wireless)/'
+kernel:   '(?:^|/)(?:sched|mm|fs|net|binfmt|crypto|syscall|openamp)/'

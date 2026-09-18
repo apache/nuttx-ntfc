@@ -1,0 +1,10 @@
+config:
+  cwd: './external'
+  build_dir: './build'
+product:
+  name: "fuzz-sim"
+  cores:
+    core0:
+      name: 'main'
+      device: 'sim'
+      defconfig: 'boards/sim/sim/sim/configs/nsh'
