@@ -123,8 +123,8 @@ def test_device_sim_init(serial_config, serial_pair):
 
     ser = DeviceSerial(serial_config)
 
-    # no path and args
-    with pytest.raises(serial.serialutil.SerialException):
+    # no port yet (USB device not enumerated): wait for boot, then time out
+    with pytest.raises(TimeoutError):
         serial_config._config["exec_path"] = ""
         serial_config._config["exec_args"] = ""
         ser.start()
@@ -191,3 +191,38 @@ def test_device_serial_boot_timeout(serial_pair, monkeypatch):
 
     # boot wait uses the configured boot_timeout
     assert boot_timeouts == [9]
+
+
+def test_device_serial_reconnect(serial_config, serial_pair):
+
+    serial_config._config["exec_path"] = serial_pair[1]
+    ser = DeviceSerial(serial_config)
+    ser._open()
+    first = ser._ser
+
+    # a failed read (USB device gone) reopens the port
+    def fail(*args, **kwargs):
+        raise serial.SerialException("device disconnected")
+
+    ser._ser.read = fail
+    assert ser._read() == b""
+    assert ser._ser is not None
+    assert ser._ser is not first
+    assert ser._lost is False
+
+    # a failed write while the port is still missing leaves it lost
+    serial_config._config["exec_path"] = "/dev/ntfc-no-such-port"
+    ser._ser.write = fail
+    assert ser._write(b"a") is None
+    assert ser._ser is None
+    assert ser._lost is True
+    assert ser._dev_is_health_priv() is False
+
+    # the health check reconnects once the port is back
+    serial_config._config["exec_path"] = serial_pair[1]
+    assert ser._dev_is_health_priv() is True
+    assert ser._lost is False
+
+    ser.stop()
+    assert ser._lost is False
+    assert ser.notalive is True

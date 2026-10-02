@@ -43,6 +43,7 @@ class DeviceSerial(DeviceCommon):
         """Initialize sim emulator device."""
         DeviceCommon.__init__(self, conf, echo=False)
         self._ser = None
+        self._lost = False
 
     def _decode_exec_args(self, args: str) -> Dict[str, Any]:
         """Decode a serial port configuration string."""
@@ -87,8 +88,41 @@ class DeviceSerial(DeviceCommon):
         except Exception as e:
             raise ValueError(f"Invalid format '{args}': {e}") from e
 
+    def _open(self) -> None:
+        """Open the serial port."""
+        path = self._conf.exec_path
+        args = self._conf.exec_args
+
+        if args:  # pragma: no cover
+            self._ser = serial.Serial(
+                path, timeout=0, **self._decode_exec_args(args)
+            )
+        else:
+            self._ser = serial.Serial(path, timeout=0)
+
+    def _port_lost(self) -> None:
+        """Drop a port that failed, e.g. a USB device re-enumerating."""
+        logger.info("serial port lost, reopening")
+
+        assert self._ser
+        self._ser.close()
+        self._ser = None
+        self._lost = True
+        self._reopen()
+
+    def _reopen(self) -> None:
+        """Try to reopen a lost port."""
+        try:
+            self._open()
+            self._lost = False
+        except serial.SerialException:
+            self._ser = None
+
     def _dev_is_health_priv(self) -> bool:
         """Check if the serial device is OK."""
+        if not self._ser and self._lost:
+            self._reopen()
+
         if not self._ser:
             return False
 
@@ -101,19 +135,23 @@ class DeviceSerial(DeviceCommon):
 
         assert self._ser
 
-        if self._conf.line_buffered:
-            if data[-1] != ord("\n"):
-                data += b"\n"
+        try:
+            if self._conf.line_buffered:
+                if data[-1] != ord("\n"):
+                    data += b"\n"
 
-            self._ser.write(data)
-        else:
-            # send char by char to avoid line length full
-            for c in data:
-                self._ser.write(bytes([c]))
+                self._ser.write(data)
+            else:
+                # send char by char to avoid line length full
+                for c in data:
+                    self._ser.write(bytes([c]))
 
-            # add new line if missing
-            if data[-1] != ord("\n"):
-                self._ser.write(b"\n")  # pragma: no cover
+                # add new line if missing
+                if data[-1] != ord("\n"):
+                    self._ser.write(b"\n")  # pragma: no cover
+        except (serial.SerialException, OSError):
+            self._port_lost()
+            return
 
         # read all garbage left by character echo
         _ = self._read_all(timeout=0)
@@ -136,22 +174,20 @@ class DeviceSerial(DeviceCommon):
 
         assert self._ser
 
-        return self._ser.read(size=1024)
+        try:
+            return self._ser.read(size=1024)
+        except (serial.SerialException, OSError):
+            self._port_lost()
+            return b""
 
     def _start_impl(self) -> None:
         """Start serial communication implementation."""
-        timeout = 0
-        path = self._conf.exec_path
-        args = self._conf.exec_args
+        logger.info(f"serial path: {self._conf.exec_path}")
+        logger.info(f"serial args: {self._conf.exec_args}")
 
-        logger.info(f"serial path: {path}")
-        logger.info(f"serial args: {args}")
-
-        if args:  # pragma: no cover
-            args = self._decode_exec_args(args)
-            self._ser = serial.Serial(path, timeout=timeout, **args)
-        else:
-            self._ser = serial.Serial(path, timeout=timeout)
+        # A USB port may show up only after the device boots
+        self._lost = True
+        self._reopen()
 
         # reboot device if possible
         self.reboot()
@@ -177,6 +213,7 @@ class DeviceSerial(DeviceCommon):
         if self._ser:  # pragma: no cover
             self._ser.close()
             self._ser = None
+        self._lost = False
         logger.info("serial device closed")
 
     def _poweroff_impl(self) -> bool:

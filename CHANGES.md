@@ -4,6 +4,7 @@
 
 - Add Renode device support.
 - Refuse commands longer than the target CONFIG_LINE_MAX.
+- Reopen serial ports that disappear on target reset (USB re-enumeration).
 
 ## 0.0.3
 
