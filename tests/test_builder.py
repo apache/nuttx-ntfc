@@ -159,6 +159,9 @@ def test_builder_reconfigures_after_kv_overrides(monkeypatch) -> None:
     monkeypatch.setattr(
         b, "_apply_kconfig_overrides", lambda *args, **kwargs: None
     )
+    monkeypatch.setattr(
+        b, "_check_kconfig_overrides", lambda *args, **kwargs: None
+    )
 
     b.build_all()
 
@@ -303,6 +306,7 @@ def test_builder_regenerates_config_after_kconfig_overrides() -> None:
     builder._run_command = lambda command, env: calls.append(command)
     builder._make_dir = builder_make_dir_dummy
     builder._apply_kconfig_overrides = lambda *_args: None
+    builder._check_kconfig_overrides = lambda *_args: None
     builder.build_all()
 
     assert calls[1] == [
@@ -488,6 +492,7 @@ def test_builder_apply_kconfig_overrides_kconfig_tweak() -> None:
         "/usr/bin/kconfig-tweak",
         "--file",
         "/tmp/.config",
+        "--keep-case",
         "--disable",
         "CONFIG_FALSE",
     ]
@@ -761,3 +766,68 @@ def test_builder_flash_supports_elf_placeholder(tmp_path) -> None:
     builder._flash_core("core0", {"core0": core})
 
     assert commands == [["pxe-stage", str(image)]]
+
+
+def test_builder_check_kconfig_overrides(tmp_path) -> None:
+    b = NuttXBuilder(copy.deepcopy(conf_dir))
+    conf = tmp_path / ".config"
+    conf.write_text(
+        "# comment\n"
+        "CONFIG_NET_IPv6=y\n"
+        "# CONFIG_OFF is not set\n"
+        "CONFIG_HEX=0x10\n"
+        "CONFIG_INT=8192\n"
+        'CONFIG_STR="abc"\n'
+        "CONFIG_MOD=m\n",
+        encoding="utf-8",
+    )
+
+    assert b._read_kconfig_values(str(conf)) == {
+        "CONFIG_NET_IPv6": "y",
+        "CONFIG_OFF": "n",
+        "CONFIG_HEX": "0x10",
+        "CONFIG_INT": "8192",
+        "CONFIG_STR": '"abc"',
+        "CONFIG_MOD": "m",
+    }
+
+    # everything applied: mixed case, disabled and absent "n", numbers by
+    # value, strings with and without quotes
+    b._check_kconfig_overrides(
+        str(conf),
+        {
+            "CONFIG_NET_IPv6": True,
+            "CONFIG_OFF": "n",
+            "CONFIG_ABSENT": False,
+            "CONFIG_HEX": "0x0010",
+            "CONFIG_INT": 8192,
+            "CONFIG_STR": "abc",
+            "CONFIG_MOD": "m",
+        },
+    )
+
+    with patch("ntfc.builder.logger.error") as error_mock:
+        with pytest.raises(AssertionError) as excinfo:
+            b._check_kconfig_overrides(
+                str(conf),
+                {
+                    "CONFIG_NET_IPV6": "y",
+                    "CONFIG_OFF": "y",
+                    "CONFIG_HEX": "0x20",
+                    "CONFIG_STR": "xyz",
+                },
+            )
+    msg = str(excinfo.value)
+    assert "CONFIG_NET_IPV6: requested y, not in .config" in msg
+    assert "CONFIG_OFF: requested y, got n" in msg
+    assert "CONFIG_HEX: requested 0x20, got 0x10" in msg
+    assert 'CONFIG_STR: requested "xyz", got "abc"' in msg
+    assert error_mock.call_count == 4
+
+
+def test_builder_kconfig_values_equal() -> None:
+    assert NuttXBuilder._kconfig_values_equal("y", "y")
+    assert NuttXBuilder._kconfig_values_equal("0x0010", "0x10")
+    assert NuttXBuilder._kconfig_values_equal("16", "0x10")
+    assert not NuttXBuilder._kconfig_values_equal("y", "n")
+    assert not NuttXBuilder._kconfig_values_equal('"a"', '"b"')

@@ -47,6 +47,7 @@ class NuttXBuilder:
     _KCONFIG_DISABLED_RE = re.compile(
         r"^#\s+(CONFIG_[A-Za-z0-9_]+)\s+is not set"
     )
+    _KCONFIG_VALUE_RE = re.compile(r"^(CONFIG_[A-Za-z0-9_]+)=(.*)$")
 
     def __init__(self, config: Dict[str, Any], rebuild: bool = True):
         """Initialize NuttX builder."""
@@ -173,7 +174,10 @@ class NuttXBuilder:
         self, tool: str, conf_path: str, key: str, value: Any
     ) -> List[str]:
         """Build one ``kconfig-tweak`` command for a Kconfig override."""
-        cmd = [tool, "--file", conf_path]
+        # Kconfig symbols are case-sensitive (e.g. CONFIG_NET_IPv6) and
+        # kconfig-tweak upper-cases them unless asked not to
+
+        cmd = [tool, "--file", conf_path, "--keep-case"]
         if value is False or value == "n":
             cmd.extend(["--disable", key])
         elif value is True or value == "y":
@@ -241,6 +245,85 @@ class NuttXBuilder:
             return f'{key}="{value}"\n'
 
         return f'{key}="{value}"\n'
+
+    def _read_kconfig_values(self, conf_path: str) -> Dict[str, str]:
+        """Read symbol values from a ``.config`` file.
+
+        :param conf_path: path to ``.config``
+        :return: map of symbol to value; ``n`` for "is not set" symbols
+        """
+        values: Dict[str, str] = {}
+        with open(conf_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.rstrip("\n")
+                disabled = self._KCONFIG_DISABLED_RE.match(line)
+                if disabled:
+                    values[disabled.group(1)] = "n"
+                    continue
+                match = self._KCONFIG_VALUE_RE.match(line)
+                if match:
+                    values[match.group(1)] = match.group(2)
+
+        return values
+
+    @staticmethod
+    def _kconfig_values_equal(requested: str, actual: str) -> bool:
+        """Compare two Kconfig values, numbers by value.
+
+        :param requested: value as written by the override
+        :param actual: value found in ``.config``
+        :return: True if the values are the same
+        """
+        if requested == actual:
+            return True
+
+        try:
+            return int(requested, 0) == int(actual, 0)
+        except ValueError:
+            return False
+
+    def _check_kconfig_overrides(
+        self, conf_path: str, overrides: Dict[str, Any]
+    ) -> None:
+        """Check that every Kconfig override is in the final ``.config``.
+
+        Kconfig drops or resets an override silently: an unknown symbol,
+        unmet dependencies or an invalid value.  Building anyway would test
+        a configuration nobody asked for.
+
+        :param conf_path: path to ``.config`` after ``olddefconfig``
+        :param overrides: requested Kconfig overrides
+        :raises AssertionError: if any override is not applied
+        """
+        values = self._read_kconfig_values(conf_path)
+        failed: List[str] = []
+
+        for key, value in overrides.items():
+            line = self._format_kconfig_line(key, value).rstrip("\n")
+            match = self._KCONFIG_VALUE_RE.match(line)
+            requested = match.group(2) if match else "n"
+            actual = values.get(key)
+
+            if actual is None and requested == "n":
+                continue
+
+            if actual is None:
+                failed.append(
+                    f"{key}: requested {requested}, not in .config "
+                    "(unknown symbol or unmet dependencies)"
+                )
+            elif not self._kconfig_values_equal(requested, actual):
+                failed.append(
+                    f"{key}: requested {requested}, got {actual} "
+                    "(unmet dependencies or invalid value)"
+                )
+
+        if failed:
+            for item in failed:
+                logger.error(f"Kconfig override not applied: {item}")
+            raise AssertionError(
+                "'kv' Kconfig overrides not applied: " + "; ".join(failed)
+            )
 
     def _apply_kconfig_overrides(
         self, conf_path: str, overrides: Dict[str, Any], cfg_cwd: str = ""
@@ -461,6 +544,12 @@ class NuttXBuilder:
                     # time from .config: configure again so overrides
                     # that enable new applications take effect
                     configure()
+
+                    # fail instead of building a configuration that
+                    # silently lost some overrides
+                    self._check_kconfig_overrides(
+                        nuttx_conf_path, kv_overrides
+                    )
 
                 # build
                 self._run_build(build_path, env=build_env)
