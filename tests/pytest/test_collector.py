@@ -83,6 +83,27 @@ def test_runner_module_exclude(config_sim, device_dummy):
             assert item.module2 != "test_Test1"
 
 
+def test_runner_test_exclude(config_sim, device_dummy):
+    with patch("ntfc.cores.get_device", return_value=device_dummy):
+        jsoncfg = {
+            "module": {
+                "exclude_test": ["test_test2_simple_1"],
+            }
+        }
+
+        p = MyPytest(config_sim, confjson=jsoncfg)
+        path = "./tests/resources/tests_dirs"
+        col = p.collect(path)
+
+        # 8 total - 1 excluded by name = 7 items
+        assert len(col.items) == 7
+        for item in col.items:
+            assert item.name != "test_test2_simple_1"
+
+        skipped = {item.name: reason for item, reason in col.skipped}
+        assert skipped == {"test_test2_simple_1": "excluded test"}
+
+
 def test_runner_module_order_complex(config_sim, device_dummy):
     with patch("ntfc.cores.get_device", return_value=device_dummy):
         # Multiple positive and negative values

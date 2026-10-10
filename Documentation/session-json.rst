@@ -19,6 +19,9 @@ and argument overrides. Path to test session configuration file is passed with
        "exclude_module": [
          "Nuttx_System_Arch_Os_Performance"
        ],
+       "exclude_test": [
+         "test_ltp_integration[ltp_interfaces_pthread_rwlock_unlock_4_2]"
+       ],
        "order": []
      },
      "args": {
@@ -35,6 +38,13 @@ and argument overrides. Path to test session configuration file is passed with
 - ``include_module``: Modules to include (empty = include all)
 
 - ``exclude_module``: Modules to exclude
+
+- ``exclude_test``: Individual tests to exclude, by pytest item name. For a
+  parametrized test the name includes the parameter, e.g.
+  ``test_ltp_integration[ltp_interfaces_pthread_rwlock_unlock_4_2]``. A name
+  matches in every module, so a board can blacklist a single case that is
+  known to fail on it without touching the test suite. An excluded test is
+  dropped from the session the same way as the tests of an excluded module.
 
 - ``order``: Force execution order. Specifies a list of objects with ``module``
   and ``value``.
