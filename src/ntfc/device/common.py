@@ -52,6 +52,7 @@ class DeviceCommon(ABC):
 
     _BUSY_LOOP_TIMEOUT = 180  # 180 sec with no data read from target
     _OUTPUT_TAIL_MAX = 4 * 1024 * 1024
+    _FLOOD_DETECT_TIME = 10  # sec of uninterrupted output after a timeout
 
     def __init__(self, conf: "CoreConfig", echo: bool = True):
         """Initialize common device."""
@@ -306,15 +307,23 @@ class DeviceCommon(ABC):
                 break
 
         # check for output flood condition.
-        # If we still get some data from dev, its possible that we stuck
-        # in some command
+        # A slow command can still be printing when the timeout expires,
+        # so keep reading until the device goes quiet. Only a device that
+        # never stops printing is flooding (stuck in some command).
         if ret == CmdStatus.TIMEOUT:
-            chunk = self._read_all(0.1)
-            if len(chunk) > 0:
+            flood_end = time.time() + self._FLOOD_DETECT_TIME
+            flood = True
+            while time.time() < flood_end:
+                chunk = self._read_all(self._read_all_sleep)
+                self._console_log(chunk)
+                if not chunk:
+                    flood = False
+                    break
+
+            if flood:
                 if not self._state_mgr.is_unhealthy():
                     self._log_device_event("fault detected: flood")
                 self._state_mgr.set_unhealthy("Flood detected")
-            self._console_log(chunk)
 
         return CmdReturn(ret, _match, output.decode("utf-8", errors="replace"))
 
