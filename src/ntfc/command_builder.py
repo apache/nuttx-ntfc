@@ -198,7 +198,11 @@ class CommandBuilder:
         items = expects if regexp else [re.escape(e) for e in expects]
 
         if match_all:
-            return "".join(f"(?=.*{item})" for item in items)
+            # Anchor the lookaheads so the engine evaluates them once from
+            # the start of the buffer. Unanchored, re.search retries them
+            # at every position and each scans to the end: quadratic in
+            # the buffer size, tens of seconds on a 100 KB console dump.
+            return "^" + "".join(f"(?=.*{item})" for item in items)
         return rf"({'|'.join(items)})"
 
     def _default_prompt_pattern(self, cmd: str, flag: str = "") -> str:
