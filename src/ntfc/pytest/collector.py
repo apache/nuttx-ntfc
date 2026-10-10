@@ -21,7 +21,7 @@
 """NTFC collector plugin for pytest."""
 
 import os
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import pytest
 
@@ -130,14 +130,29 @@ class CollectorPlugin:
         """Pytest collection finish callback."""
 
     def _filter_modules(
-        self, ci: CollectedItem, include: List[str], exclude: List[str]
+        self,
+        ci: CollectedItem,
+        include: List[str],
+        exclude: List[str],
+        exclude_test: Optional[List[str]] = None,
     ) -> Tuple[bool, str]:
-        """Filter modules based on include/exclude lists."""
+        """Filter modules based on include/exclude lists.
+
+        :param ci: Collected item to check.
+        :param include: Modules to run; everything else is skipped.
+        :param exclude: Modules to skip.
+        :param exclude_test: Test names to skip, e.g.
+            ``test_ltp_integration[ltp_interfaces_pthread_rwlock_unlock_4_2]``.
+        :return: ``(skip, reason)`` tuple.
+        """
         if include and ci.module2 not in include:
             return True, "not in include_module"
 
         if exclude and ci.module2 in exclude:
             return True, "excluded module"
+
+        if exclude_test and ci.name in exclude_test:
+            return True, "excluded test"
 
         return False, ""
 
@@ -172,6 +187,7 @@ class CollectorPlugin:
         module = pytest.cfgtest.get("module", {})
         include_module = module.get("include_module", [])
         exclude_module = module.get("exclude_module", [])
+        exclude_test = module.get("exclude_test", [])
         order_list = module.get("order", [])
         order_map = {
             e["module"]: int(e["value"])
@@ -187,7 +203,7 @@ class CollectorPlugin:
             skip, reason = self._filter.check_test_support(item)
             if not skip:
                 skip, reason = self._filter_modules(
-                    ci, include_module, exclude_module
+                    ci, include_module, exclude_module, exclude_test
                 )
 
             if skip:
