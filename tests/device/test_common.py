@@ -20,6 +20,7 @@
 
 import os
 import tempfile
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -29,6 +30,7 @@ from ntfc.device.common import CmdReturn, CmdStatus, DeviceCommon
 from ntfc.log.handler import LogHandler
 
 g_mock_read = b""
+g_mock_read_until = None
 
 
 class DeviceMock(DeviceCommon):
@@ -44,6 +46,8 @@ class DeviceMock(DeviceCommon):
 
     def _read(self, _=0):
         """Mock."""
+        if g_mock_read_until is not None and time.time() > g_mock_read_until:
+            return b""
         return g_mock_read
 
     def _write(self, _):
@@ -120,6 +124,7 @@ def test_device_common_send_cmd_pattern():
         config = mockdevice.return_value
 
         dev = DeviceMock(config)
+        dev._FLOOD_DETECT_TIME = 0.5
         assert dev is not None
 
         assert dev.flood is False
@@ -152,6 +157,31 @@ def test_device_common_send_cmd_pattern():
         assert ret.status == CmdStatus.TIMEOUT
 
 
+def test_device_common_slow_output_is_timeout_not_flood():
+    """Output that still arrives at the timeout but then stops is a TIMEOUT."""
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+
+        global g_mock_read, g_mock_read_until
+
+        config = mockdevice.return_value
+        config.read_poll_interval = 0.05
+        dev = DeviceMock(config)
+        dev._dev_is_health_priv = lambda: True
+
+        # the device keeps printing for 0.5s past the 1s command timeout
+        # and then goes quiet: a slow command, not a stuck one
+        g_mock_read = b"x" * 100
+        g_mock_read_until = time.time() + 1.5
+        try:
+            ret = dev.send_cmd_read_until_pattern(b"", b"y", 1)
+        finally:
+            g_mock_read_until = None
+
+        assert ret.status == CmdStatus.TIMEOUT
+        assert dev.flood is False
+        assert dev.dev_is_health() is True
+
+
 def test_device_common_send_cmd_fail_pattern():
 
     with patch("ntfc.envconfig.EnvConfig") as mockdevice:
@@ -160,6 +190,7 @@ def test_device_common_send_cmd_fail_pattern():
 
         config = mockdevice.return_value
         dev = DeviceMock(config)
+        dev._FLOOD_DETECT_TIME = 0.5
 
         # fail_pattern detected before success pattern → FAILED, exits early
         g_mock_read = b"ERROR: something bad"
@@ -211,6 +242,7 @@ def test_device_common_read_until_pattern():
 
         config = mockdevice.return_value
         dev = DeviceMock(config)
+        dev._FLOOD_DETECT_TIME = 0.5
 
         # success: pattern found in output
         g_mock_read = b"PASS: all tests ok"

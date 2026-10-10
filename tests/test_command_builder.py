@@ -19,6 +19,7 @@
 ############################################################################
 
 import re
+import time
 
 import pytest
 
@@ -61,11 +62,11 @@ def test_build_expect_pattern(builder: CommandBuilder) -> None:
     )
     assert (
         builder._build_expect_pattern(["aaa", "bbb"], True, False)
-        == "(?=.*aaa)(?=.*bbb)"
+        == "^(?=.*aaa)(?=.*bbb)"
     )
     assert (
         builder._build_expect_pattern(["aaa", "bbb"], True, True)
-        == "(?=.*aaa)(?=.*bbb)"
+        == "^(?=.*aaa)(?=.*bbb)"
     )
     assert (
         builder._build_expect_pattern(["aaa", "bbb"], False, True)
@@ -98,6 +99,27 @@ def test_prepare_pattern_with_expects(builder: CommandBuilder) -> None:
     assert re.search(p2, "A")
     assert re.search(p2, "B")
     assert re.search(p2, "cmd: command not found")
+
+
+def test_prepare_pattern_match_all_is_linear(builder: CommandBuilder) -> None:
+    """A match_all pattern must not scan the buffer once per position."""
+    p = builder._prepare_pattern(
+        "popen", ["Calling pclose()"], "", True, False
+    )
+    # a device dumping thousands of builtin names before the expected line
+    buf = "    ltp_some_test_case_name_padded_to_width\n" * 5000
+    assert len(buf) > 200000
+
+    t0 = time.time()
+    assert re.search(p, buf) is None
+    assert time.time() - t0 < 0.5
+
+    assert re.search(p, buf + "Calling pclose()\n")
+    assert re.search(p, buf + "popen: command not found\n")
+
+    p2 = builder._prepare_pattern("cmd", ["A", "B"], "", True, False)
+    assert re.search(p2, buf + "B\n" + buf + "A\n")
+    assert re.search(p2, buf + "A\n") is None
 
 
 def test_prepare_pattern_without_expects(builder: CommandBuilder) -> None:
