@@ -102,6 +102,15 @@ class DeviceCommon(ABC):
         if len(self._output_tail_buf) > self._OUTPUT_TAIL_MAX:
             del self._output_tail_buf[: -self._OUTPUT_TAIL_MAX]
 
+    def _idle_at_prompt(self) -> bool:
+        """Return True when the last output ended with the shell prompt.
+
+        A target that printed its prompt is waiting for input, not stuck,
+        so silence after it is a command timeout rather than a busy loop.
+        """
+        tail = _ANSI_ESCAPE_RE.sub(b"", bytes(self._output_tail_buf[-256:]))
+        return tail.rstrip().endswith(self._dev.prompt.strip())
+
     def output_tail(self) -> str:
         """Return the most recent raw device output.
 
@@ -195,10 +204,12 @@ class DeviceCommon(ABC):
                 break
 
             # check for busy loop
-            # trigger an error if there was no data to read for a long time
+            # trigger an error if there was no data to read for a long time,
+            # unless the target is simply waiting at its prompt
             if not chunk:
-                if (  # pragma: no cover
+                if (
                     not self._state_mgr.is_busy_loop()
+                    and not self._idle_at_prompt()
                     and self._state_mgr.check_busy_loop_timeout()
                 ):
                     self._log_device_event("fault detected: busyloop")
