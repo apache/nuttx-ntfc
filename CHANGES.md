@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add Renode device support.
+- Refuse commands longer than the target CONFIG_LINE_MAX.
 
 ## 0.0.3
 
