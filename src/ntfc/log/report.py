@@ -20,6 +20,7 @@
 
 """Report generation module for NTFC."""
 
+import copy
 import glob
 import html
 import os
@@ -118,22 +119,10 @@ class Reporter:
             new_testsuite.set("time", str(time_total))
             new_testsuite.set("name", module_name)
 
-            # Add all test cases
+            # Add all test cases, including nested elements such as
+            # <properties><property/></properties>
             for testcase in testcases:
-                # Deep copy the testcase element
-                new_testcase = ElementTree.SubElement(
-                    new_testsuite, "testcase"
-                )
-                for attr, value in testcase.attrib.items():
-                    new_testcase.set(attr, value)
-
-                # Copy all child elements
-                for child in testcase:
-                    new_child = ElementTree.SubElement(new_testcase, child.tag)
-                    for attr, value in child.attrib.items():
-                        new_child.set(attr, value)
-                    if child.text:
-                        new_child.text = child.text
+                new_testsuite.append(copy.deepcopy(testcase))
 
             # Write per-module XML file
             output_file = os.path.join(

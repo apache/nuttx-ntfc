@@ -99,6 +99,28 @@ class EnvConfig:
         return {**default_config, **heartbeat_cfg}
 
     @property
+    def resources(self) -> Dict[str, Any]:
+        """Return resource monitoring configuration.
+
+        :return: Dictionary with keys: 'enabled' (bool), 'probes' (list),
+            'settle_retries' (int), 'settle_delay' (float),
+            'heap_tolerance' (int), 'cpuload_max' (float). Defaults to
+            disabled if not configured.
+        """
+        default_config = {
+            "enabled": False,
+            "probes": ["tasks", "fds"],
+            "settle_retries": 3,
+            "settle_delay": 1.0,
+            "heap_tolerance": 0,
+            "cpuload_max": 10,
+        }
+        config = self._cfg_values.get("config", {})
+        resources_cfg = config.get("resources", {})
+
+        return {**default_config, **resources_cfg}
+
+    @property
     def recovery(self) -> Dict[str, Any]:
         """Return device recovery configuration.
 

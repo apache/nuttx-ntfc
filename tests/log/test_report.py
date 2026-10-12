@@ -367,6 +367,30 @@ def test_split_xml_by_module():
             assert os.path.exists(module_file)
 
 
+def test_split_xml_by_module_keeps_nested_properties():
+    """Test that testcase properties survive the per-module split."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        xml_file = os.path.join(tmpdir, "report.xml")
+        testsuites = Element("testsuites")
+        testsuite = SubElement(testsuites, "testsuite")
+        tc = SubElement(testsuite, "testcase")
+        tc.set("name", "test_one")
+        tc.set("classname", "test_module1.py::test_one")
+        tc.set("time", "1.0")
+        props = SubElement(tc, "properties")
+        prop = SubElement(props, "property")
+        prop.set("name", "resources")
+        prop.set("value", "{}")
+        ElementTree(testsuites).write(xml_file)
+
+        module_files = Reporter()._split_xml_by_module(xml_file, tmpdir)
+
+        root = ElementTree(file=module_files["test_module1"]).getroot()
+        found = root.findall(".//testcase/properties/property")
+        assert len(found) == 1
+        assert found[0].get("name") == "resources"
+
+
 def test_split_xml_by_module_nonexistent_file():
     """Test _split_xml_by_module with nonexistent file."""
     with tempfile.TemporaryDirectory() as tmpdir:

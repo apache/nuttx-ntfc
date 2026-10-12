@@ -250,7 +250,26 @@ NTFC provides built-in fixtures and pytest marks for test development.
 
 Built-in Fixtures:
 
-TODO
+.. list-table::
+   :header-rows: 1
+
+   * - Fixture
+     - Purpose
+   * - ``core``
+     - Current core name, parametrized with ``--run_in_cores``
+   * - ``switch_to_core``
+     - Switch to the parametrized core in SMP mode and back afterwards
+   * - ``resources``
+     - Fail the test if resources are not released (see
+       :ref:`resource-monitoring`). List it after ``switch_to_core`` so
+       sampling happens on the switched core.
+
+.. code-block:: python
+
+   @pytest.mark.resources(probes=["heap", "tasks"], heap_tolerance=64)
+   def test_no_leak(resources):
+       ret = pytest.product.sendCommand("app", ["done"], timeout=15)
+       assert ret == 0
 
 Custom Fixtures:
 
@@ -300,6 +319,9 @@ Available Marks:
    * - ``@pytest.mark.skip()``
      - Skip test conditionally
      - ``@pytest.mark.skip(reason="not ready")``
+   * - ``@pytest.mark.resources()``
+     - Override resource monitor options for one test
+     - ``@pytest.mark.resources(probes=["heap"])``
    * - ``@pytest.mark.parser_binary()``
      - Discover and run test framework tests (cmocka / custom) as pytest items
      - ``@pytest.mark.parser_binary("bin", list_pattern=..., result_pattern=...)``

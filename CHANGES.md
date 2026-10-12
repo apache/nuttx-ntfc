@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add Renode device support.
+- Add opt-in resource leak detection fixture.
 
 ## 0.0.3
 
