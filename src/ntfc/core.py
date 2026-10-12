@@ -127,6 +127,28 @@ class ProductCore:
             matched = matched.decode("utf-8", errors="ignore")
         return self._device.no_cmd in matched
 
+    def _check_line_max(self, cmd: bytes) -> None:
+        """Refuse a command the target shell cannot buffer in one line.
+
+        NSH reads at most ``CONFIG_LINE_MAX - 1`` characters per line and
+        executes the overflow as a second command, which fails in
+        confusing ways. The limit is only known when the Kconfig of the
+        image is available.
+
+        :param cmd: Encoded command including its line terminator.
+        :raises ValueError: Command does not fit the target line buffer.
+        """
+        limit = self._conf.kv_check("CONFIG_LINE_MAX")
+        if not limit:
+            return
+        length = len(cmd.rstrip(b"\r\n"))
+        if length >= int(limit):
+            raise ValueError(
+                f"command is {length} characters, the target buffers at "
+                f"most {int(limit) - 1} (CONFIG_LINE_MAX={limit}): "
+                f"{cmd.decode(errors='replace').strip()!r}"
+            )
+
     def sendCommand(  # noqa: N802
         self,
         cmd: str,
@@ -162,6 +184,7 @@ class ProductCore:
         encoded = self._builder.build(
             cmd, expects, args, flag, match_all, regexp, fail_pattern
         )
+        self._check_line_max(encoded.cmd)
 
         logger.debug(
             f"Sending command: {encoded.cmd.decode()}, expecting: "
@@ -204,6 +227,7 @@ class ProductCore:
         :return: CmdReturn : command return data
         """
         encoded = self._builder.build_raw(cmd, pattern, args, fail_pattern)
+        self._check_line_max(encoded.cmd)
 
         logger.debug(
             f"Sending command: {encoded.cmd.decode()}, expecting pattern: "

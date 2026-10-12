@@ -201,7 +201,9 @@ Decorators:
   enabled
 
 The :meth:`~ntfc.products.ProductsHandler.sendCommand` method handles
-execution and verification.
+execution and verification. A command that does not fit the target shell
+line buffer (``CONFIG_LINE_MAX`` minus one character) is refused with a
+``ValueError`` instead of being split by the shell.
 
 Parametrized Command Test
 --------------------------

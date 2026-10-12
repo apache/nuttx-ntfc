@@ -25,6 +25,7 @@ import pytest
 
 from ntfc.core import CoreStatus, ProductCore
 from ntfc.device.common import CmdReturn, CmdStatus
+from ntfc.envconfig import EnvConfig
 
 
 def test_core_init(envconfig_dummy):
@@ -100,6 +101,40 @@ def test_core_send_command(envconfig_dummy):
             CmdStatus.SUCCESS, tmp
         )
         assert p.sendCommand("test") == CmdStatus.NOTFOUND
+
+
+def test_core_rejects_command_longer_than_line_max(config_sim):
+    """A command the shell cannot buffer is refused instead of split."""
+
+    with patch("ntfc.device.common.DeviceCommon") as mockdevice:
+        dev = mockdevice.return_value
+        dev.prompt = b"NSH> "
+        dev.no_cmd = "command not found"
+        dev.send_cmd_read_until_pattern.return_value = CmdReturn(
+            CmdStatus.SUCCESS
+        )
+        core = EnvConfig(config_sim).product[0].cfg_core(0)
+        assert core.kv_check("CONFIG_LINE_MAX") == 80
+        p = ProductCore(dev, core)
+
+        assert p.sendCommand("x" * 79) == CmdStatus.SUCCESS
+        with pytest.raises(ValueError, match="CONFIG_LINE_MAX"):
+            p.sendCommand("x" * 80)
+        with pytest.raises(ValueError, match="CONFIG_LINE_MAX"):
+            p.sendCommandReadUntilPattern("x" * 70, args=["y" * 10])
+
+
+def test_core_line_max_unknown_is_not_checked(envconfig_dummy):
+
+    with patch("ntfc.device.common.DeviceCommon") as mockdevice:
+        dev = mockdevice.return_value
+        dev.prompt = b"NSH> "
+        dev.no_cmd = "command not found"
+        dev.send_cmd_read_until_pattern.return_value = CmdReturn(
+            CmdStatus.SUCCESS
+        )
+        p = ProductCore(dev, envconfig_dummy.product[0].cfg_core(0))
+        assert p.sendCommand("x" * 500) == CmdStatus.SUCCESS
 
 
 def test_core_send_command_read_until_pattern(envconfig_dummy):
