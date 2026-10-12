@@ -165,6 +165,7 @@ def test_device_common_slow_output_is_timeout_not_flood():
 
         config = mockdevice.return_value
         config.read_poll_interval = 0.05
+        config.prompt = "nsh> "
         dev = DeviceMock(config)
         dev._dev_is_health_priv = lambda: True
 
@@ -275,6 +276,44 @@ def test_device_common_read_until_pattern_uses_configured_poll_interval():
 
         assert ret.status == CmdStatus.SUCCESS
         read_all.assert_called_once_with(0.001)
+
+
+class DeviceMockQuickBusyloop(DeviceMock):
+    """Device mock with a short busy-loop threshold and scripted reads."""
+
+    _BUSY_LOOP_TIMEOUT = 0.2
+
+    def __init__(self, config, reads):
+        self._reads = list(reads)
+        config.prompt = "nsh> "
+        DeviceMock.__init__(self, config)
+
+    def _read(self, _=0):
+        return self._reads.pop(0) if len(self._reads) > 1 else self._reads[0]
+
+
+def test_device_common_idle_at_prompt_is_not_busyloop():
+    """A target waiting at its prompt is idle, not stuck."""
+
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        dev = DeviceMockQuickBusyloop(
+            mockdevice.return_value, [b"nsh> cmd\r\nout\r\nnsh> ", b""]
+        )
+        ret = dev.read_until_pattern(b"PASS", 1)
+        assert ret.status == CmdStatus.TIMEOUT
+        assert dev.busyloop is False
+
+
+def test_device_common_silence_without_prompt_is_busyloop():
+    """No prompt and no output past the threshold is a busy loop."""
+
+    with patch("ntfc.envconfig.EnvConfig") as mockdevice:
+        dev = DeviceMockQuickBusyloop(
+            mockdevice.return_value, [b"nsh> cmd\r\nrunning", b""]
+        )
+        ret = dev.read_until_pattern(b"PASS", 1)
+        assert ret.status == CmdStatus.TIMEOUT
+        assert dev.busyloop is True
 
 
 def test_device_common_panic_char():

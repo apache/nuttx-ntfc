@@ -5,6 +5,7 @@
 - Add Renode device support.
 - Refuse commands longer than the target CONFIG_LINE_MAX.
 - Reopen serial ports that disappear on target reset (USB re-enumeration).
+- Do not treat a target idle at its prompt as a busy loop.
 
 ## 0.0.3
 
