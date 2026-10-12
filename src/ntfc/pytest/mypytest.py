@@ -42,6 +42,7 @@ from .collector import CollectorPlugin
 from .configure import PytestConfigPlugin
 from .gtest_plugin import GtestParserPlugin
 from .parsers import ParserPlugin
+from .resources_plugin import ResourcePlugin
 from .runner import RunnerPlugin
 from .signal_plugin import SignalPlugin
 
@@ -390,6 +391,9 @@ class MyPytest:
         # run pytest with our custom test plugin
         runner = RunnerPlugin(nologs)
 
+        # resource leak detection fixture
+        resources = ResourcePlugin(self._config, pytest.products)
+
         # optional debug plugins (coredump collection)
         debug = get_debug_setup(pytest.products)
         self._ptconfig.set_restart_gdb(debug.restart_all_controllers)
@@ -400,7 +404,9 @@ class MyPytest:
         try:
             # attach GDB controllers after the devices are up
             debug.start(pytest.result_dir)
-            return self._run(opt, [runner, collector, *debug.plugins])
+            return self._run(
+                opt, [runner, collector, resources, *debug.plugins]
+            )
         finally:
             debug.stop()
             self._device_stop()

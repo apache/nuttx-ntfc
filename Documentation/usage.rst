@@ -229,6 +229,80 @@ Remaining tests are skipped if all retries fail.
        max_retries: 3      # reboot attempts before skipping remaining tests
        base_delay: 2.0     # seconds between retries (doubles each attempt)
 
+.. _resource-monitoring:
+
+Resource Monitoring
+===================
+
+Tests that request the ``resources`` fixture get their resource usage
+sampled before and after the test body. A delta that does not settle fails
+the test at teardown. The feature is disabled unless enabled here and needs
+``CONFIG_FS_PROCFS`` on the target.
+
+.. code-block:: yaml
+
+   config:
+     resources:
+       enabled: True
+       probes: [tasks, fds]         # default
+       settle_retries: 3            # re-samples while a delta remains
+       settle_delay: 1.0            # seconds between re-samples
+       heap_tolerance: 0            # bytes of heap growth tolerated
+       cpuload_max: 10              # percent, cpuload probe only
+
+Each probe runs one NSH command and compares the two samples:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Probe
+     - Command
+     - Reports
+     - Requires
+   * - ``heap``
+     - ``free``
+     - ``used`` grew past ``heap_tolerance`` or ``nused`` grew, per heap
+     - ``CONFIG_NSH_DISABLE_FREE`` unset
+   * - ``tasks``
+     - ``ps``
+     - a task or thread present after the test but not before
+     - ``CONFIG_NSH_DISABLE_PS`` unset
+   * - ``fds``
+     - ``cat /proc/self/group/fd``
+     - a descriptor opened in the shell task group and not closed
+     - ``CONFIG_NSH_DISABLE_CAT`` unset
+   * - ``iob``
+     - ``cat /proc/iobinfo``
+     - fewer free network buffers
+     - ``CONFIG_MM_IOB``
+   * - ``mempool``
+     - ``cat /proc/mempool``
+     - ``nused`` grew, per pool
+     - ``CONFIG_MM_HEAP_MEMPOOL``
+   * - ``net``
+     - ``cat /proc/net/tcp``, ``cat /proc/net/udp``
+     - a new connection
+     - ``CONFIG_NET``
+   * - ``cpuload``
+     - ``cat /proc/cpuload``
+     - load above ``cpuload_max`` after the test
+     - ``CONFIG_SCHED_CPULOAD``
+
+A probe whose Kconfig requirements (including the matching
+``CONFIG_FS_PROCFS_EXCLUDE_*`` option) are not met on every product is
+dropped with a warning. The final delta is written to the device log and to
+the ``resources`` user property of the test report. Tests that crash or
+busy-loop are not checked.
+
+``tasks`` keys entries by TID and command name; set ``CONFIG_TASK_NAME_SIZE``
+above zero so a leaked task is reported by name rather than ``<noname>``.
+
+``heap`` is not a default: first-use allocations (stdio buffers, work
+queues) and shell state (environment variables, ``OLDPWD``) show up as
+growth, so it reports more than true leaks. Enable it per test with the
+``resources`` marker and a ``heap_tolerance`` that fits, or repeat the run
+with ``--loops`` and look for growth that recurs on every loop.
+
 Signal Handlers
 ===============
 

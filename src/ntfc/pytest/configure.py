@@ -143,6 +143,8 @@ class PytestConfigPlugin:
             "extra_opts: Additional parameters for testing "
             "(e.g., --run_in_cores=cpu1,cpu2)",
             "config_value_check: Validate complex configuration strings",
+            "resources: Override resource monitor options for one test "
+            "(e.g., probes=['heap'], heap_tolerance=64)",
         ]
 
         for m in markers:

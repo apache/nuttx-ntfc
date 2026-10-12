@@ -25,6 +25,7 @@ import pytest
 
 from ntfc.envconfig import EnvConfig
 from ntfc.pytest.mypytest import MyPytest
+from ntfc.pytest.resources_plugin import ResourcePlugin
 
 
 def test_collector_collect_file(config_sim, device_dummy):
@@ -333,6 +334,7 @@ def test_runner_wires_debug_plugins(config_dummy, device_dummy, monkeypatch):
         monkeypatch.setattr(_pytest, "products", [], raising=False)
 
         assert p.runner("tests", {}, nologs=True) == 0
+        assert any(isinstance(pl, ResourcePlugin) for pl in run_plugins)
 
         assert debug_plugin in run_plugins
         debug.start.assert_called_once_with("")
