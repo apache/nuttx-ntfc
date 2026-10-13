@@ -3,8 +3,13 @@
 ## Unreleased
 
 - Add Renode device support.
+- Fail the build when a Kconfig override is not applied.
+- Report a slow command as TIMEOUT instead of a flood.
+- Fix slow match_all lookups on large console output.
+- Add exclude_test to session.json to skip tests per board.
 - Refuse commands longer than the target CONFIG_LINE_MAX.
 - Reopen serial ports that disappear on target reset (USB re-enumeration).
+- Do not treat a target idle at its prompt as a busy loop.
 
 ## 0.0.3
 

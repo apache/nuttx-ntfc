@@ -216,6 +216,11 @@ consecutive failures the device is marked ``BUSY_LOOP``.
        interval: 60    # seconds between probes, minimum 30
        threshold: 3    # consecutive failures to declare busyloop
 
+Busy-loop detection also fires when the device prints nothing for 180
+seconds while a command is pending. A device that already printed its
+prompt is waiting for input, so silence after the prompt only makes the
+command time out and does not trigger a reboot.
+
 Device Recovery
 ===============
 
