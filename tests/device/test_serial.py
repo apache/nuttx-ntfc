@@ -137,9 +137,17 @@ def test_device_sim_init(serial_config, serial_pair):
 
     stop = threading.Event()
     device_thread = threading.Thread(
-        target=fake_device_thread, args=(serial_pair[0], stop)
+        target=fake_device_thread, args=(serial_pair[0], stop), daemon=True
     )
     device_thread.start()
+    try:
+        _sim_init_running(ser)
+    finally:
+        stop.set()
+        device_thread.join(timeout=1)
+
+
+def _sim_init_running(ser):
 
     global g_fake_device_retval
     g_fake_device_retval = b"\n\rnsh>"
@@ -156,13 +164,10 @@ def test_device_sim_init(serial_config, serial_pair):
 
     # soft reboot: device must respond with prompt for boot wait to succeed
     g_fake_device_retval = b"\n\rnsh>"
-    assert ser.reboot(hard=False) is True
+    assert ser.reboot(timeout=5, hard=False) is True
 
     # soft poweroff: sends OS command, no boot wait required
     assert ser.poweroff(hard=False) is True
-
-    stop.set()
-    device_thread.join(timeout=1)
 
 
 def test_device_serial_boot_timeout(serial_pair, monkeypatch):
