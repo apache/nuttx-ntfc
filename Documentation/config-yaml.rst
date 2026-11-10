@@ -16,12 +16,12 @@ This file defines device-under-test (DUT) setup and global configuration.
      cores:                   # List of product cores
        core0:                 # Core0 entry
          name: 'core0-name'
-         device: 'sim|qemu|renode|serial'
+         device: 'sim|qemu|renode|serial|netdev'
          # Device-specific configuration
 
        core1:                 # Core1 entry
          name: 'core1-name'
-         device: 'sim|qemu|renode|serial'
+         device: 'sim|qemu|renode|serial|netdev'
          # Device-specific configuration
 
 
@@ -37,7 +37,7 @@ This file defines device-under-test (DUT) setup and global configuration.
      cores:
        core0:
          name: 'core-name'
-         device: 'sim|qemu|renode|serial'
+         device: 'sim|qemu|renode|serial|netdev'
          # Device-specific configuration
 
    product1:
@@ -45,7 +45,7 @@ This file defines device-under-test (DUT) setup and global configuration.
      cores:
        core0:
          name: 'core-name'
-         device: 'sim|qemu|renode|serial'
+         device: 'sim|qemu|renode|serial|netdev'
          # Device-specific configuration
 
 
@@ -271,6 +271,169 @@ For real hardware with UART communication:
 - PARITY: 'n' (None), 'e' (Even), 'o' (Odd), 'm' (Mark), 's' (Space)
 - DATABITS: 5, 6, 7, or 8
 - STOPBITS: 1, 1.5, or 2
+
+Netdev Console
+==============
+
+The ``netconsole`` core option runs the NuttX console over a network
+transport (``CONFIG_CONSOLE_NETDEV``) instead of a serial port or the
+emulator's pty. The transport is implemented in
+:mod:`ntfc.device.netconsole`. It can be used in two ways:
+
+- with the spawned devices (``sim`` and ``qemu``, through
+  :class:`ntfc.device.host.DeviceHost`): add ``netconsole`` to the core;
+  the child pty output is kept in the debug log;
+- with real hardware: use ``device: 'netdev'``
+  (:class:`ntfc.device.netdev.DeviceNetdev`). NTFC only talks to the board
+  over the transport; the board is reset and powered off with the
+  ``reboot`` and ``poweroff`` system commands, as for a serial device.
+
+  .. code-block:: yaml
+
+     cores:
+       core0:
+         name: 'main'
+         device: 'netdev'
+         reboot: 'st-flash reset'
+         boot_timeout: 30
+         netconsole:
+           type: 'udp'
+           port: 55000
+
+  The UDP target address is learned from the console output, so the board
+  must print something after the transport is started: use a ``reboot``
+  command that resets the board.
+
+NTFC opens the transport before it spawns the target, so the console
+output sent at boot is not lost. Both transports carry datagrams, so a
+command is split into datagrams of ``chunk`` bytes that fit the target
+receive buffer (``CONFIG_CONSOLE_NETDEV_RXBUFSIZE``, 256 by default).
+
+UDP
+---
+
+.. code-block:: yaml
+
+   cores:
+     core0:
+       name: 'main'
+       device: 'qemu'
+       netconsole:
+         type: 'udp'
+         port: 55000         # CONFIG_CONSOLE_NETDEV_PORT
+         bind: '0.0.0.0'     # optional
+         chunk: 128          # optional
+
+NTFC listens on ``port`` for the datagrams the target sends to
+``CONFIG_CONSOLE_NETDEV_IPADDR`` and replies to the address the last
+datagram came from, so the target address is not configured. Commands
+written before the target sent anything are dropped.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Key
+     - Description
+   * - ``port``
+     - UDP port, ``CONFIG_CONSOLE_NETDEV_PORT``. Defaults to ``55000``
+   * - ``bind``
+     - (Optional) Host address to listen on. Defaults to ``0.0.0.0``
+   * - ``chunk``
+     - (Optional) Bytes per datagram. Defaults to ``128``
+
+CAN ISO-TP
+----------
+
+.. code-block:: yaml
+
+   cores:
+     core0:
+       name: 'main'
+       device: 'qemu'
+       netconsole:
+         type: 'isotp'
+         interface: 'can0'
+         rx_id: 0x7d0        # target TX ID, CONFIG_CONSOLE_NETDEV_PORT
+         tx_id: 0x7d1        # target RX ID, CONFIG_CONSOLE_NETDEV_PORT + 1
+         fd: false           # true when the target has CONFIG_NET_CAN_CANFD
+
+The host uses a Linux ``can_isotp`` socket, so the ``can_isotp`` kernel
+module must be loaded (``sudo modprobe can_isotp``).
+
+.. list-table::
+   :header-rows: 1
+
+   * - Key
+     - Description
+   * - ``interface``
+     - Host CAN interface. Defaults to ``can0``
+   * - ``rx_id``
+     - CAN ID the target sends on, ``CONFIG_CONSOLE_NETDEV_PORT``.
+       Defaults to ``2000`` (``0x7d0``)
+   * - ``tx_id``
+     - CAN ID the target receives on, ``CONFIG_CONSOLE_NETDEV_PORT + 1``.
+       Defaults to ``rx_id + 1``
+   * - ``fd``
+     - (Optional) Use CAN FD frames, required when the target is built with
+       ``CONFIG_NET_CAN_CANFD``. Defaults to ``false``
+   * - ``chunk``
+     - (Optional) Bytes per ISO-TP message. Defaults to ``128``
+
+Example: qemu-intel64
+---------------------
+
+The NuttX ``qemu-intel64:eth_console`` configuration runs the console over
+UDP on an e1000 card: the target is ``192.168.8.104`` and sends the console
+to ``192.168.8.1`` port ``55000``. Give the host that address on a TAP
+interface (or on a bridge the TAP interface is attached to):
+
+.. code-block:: bash
+
+   sudo ip tuntap add dev tap0 mode tap user $USER
+   sudo ip addr add 192.168.8.1/24 dev tap0
+   sudo ip link set tap0 up
+
+.. code-block:: yaml
+
+   cores:
+     core0:
+       name: 'main'
+       device: 'qemu'
+       exec_path: 'qemu-system-x86_64'
+       exec_args: '-m 2G -nographic -serial mon:stdio
+                   -device e1000,netdev=n0
+                   -netdev tap,id=n0,ifname=tap0,script=no,downscript=no'
+       netconsole:
+         type: 'udp'
+         port: 55000
+
+For ISO-TP, build the target with ``CONFIG_NET_CAN_ISOTP``,
+``CONFIG_NET_CAN_SOCK_OPTS`` and a PCI CAN controller (``CONFIG_CAN_KVASER``
+with ``CONFIG_CAN_KVASER_SOCKET``) and connect the QEMU CAN bus to the host
+interface ``can0`` (a ``vcan`` interface works as well):
+
+.. code-block:: bash
+
+   sudo modprobe can_isotp
+   sudo ip link add dev can0 type vcan
+   sudo ip link set can0 up
+
+.. code-block:: yaml
+
+   cores:
+     core0:
+       name: 'main'
+       device: 'qemu'
+       exec_path: 'qemu-system-x86_64'
+       exec_args: '-m 2G -nographic -serial mon:stdio
+                   -object can-bus,id=canbus0
+                   -object can-host-socketcan,id=canhost0,if=can0,canbus=canbus0
+                   -device kvaser_pci,canbus=canbus0'
+       netconsole:
+         type: 'isotp'
+         interface: 'can0'
+         rx_id: 0x7d0
+         tx_id: 0x7d1
 
 Configuration Approaches
 ========================
@@ -518,6 +681,10 @@ These fields are parsed by :class:`ntfc.coreconfig.CoreConfig`.
    * - ``kv``
      - Per-core Kconfig overrides applied before build. Overrides matching
        keys from global ``config.kv``
+   * - ``netconsole``
+     - (Optional) Run the console over a NuttX netdev console (UDP or CAN
+       ISO-TP) instead of the emulator pty (sim/qemu only).
+       See `Netdev Console`_
 
 Linux Targets
 =============

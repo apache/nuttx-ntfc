@@ -5,6 +5,8 @@
 - Add Renode device support.
 - Refuse commands longer than the target CONFIG_LINE_MAX.
 - Reopen serial ports that disappear on target reset (USB re-enumeration).
+- Add the console over a NuttX netdev console (UDP or CAN ISO-TP) for sim, QEMU
+  and real hardware (``netdev`` device).
 
 ## 0.0.3
 
