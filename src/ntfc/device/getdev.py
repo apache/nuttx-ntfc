@@ -22,6 +22,7 @@
 
 from typing import TYPE_CHECKING, Callable, Dict
 
+from .netdev import DeviceNetdev
 from .qemu import DeviceQemu
 from .renode import DeviceRenode
 from .serial import DeviceSerial
@@ -38,6 +39,7 @@ _DEVICE_FACTORIES: Dict[str, Callable[["CoreConfig"], "DeviceCommon"]] = {
     "qemu": DeviceQemu,
     "serial": DeviceSerial,
     "renode": DeviceRenode,
+    "netdev": DeviceNetdev,
 }
 
 ###############################################################################

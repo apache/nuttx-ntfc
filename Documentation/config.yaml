@@ -63,7 +63,7 @@ product:                          # many products can be supported in tests (pro
   cores:                          # Cores configuration
     core0:                        # Main core (core 0)
       name: ''                    # Core name
-      device: ''                  # Choose a device: sim, qemu, renode, serial
+      device: ''                  # Choose a device: sim, qemu, renode, serial, netdev
       exec_path: ''               # Path of emulator execution for QEMU targets eg: `qemu-system-x86_64`
                                   # Renode launcher for renode targets, eg: `renode`
                                   # Path of serial port for serial targets, eg: `/dev/ttyACM0`
@@ -99,6 +99,13 @@ product:                          # many products can be supported in tests (pro
                                   # Keep false for the default byte-wise behavior.
                                   # Enable for sim or a serial transport with flow control.
                                   # Target serial RX buffer must hold a whole command line.
+      netconsole:                 # (optional, required for netdev) NuttX netdev console instead of
+        type: 'udp'               # the sim/qemu pty or for real HW: 'udp' or 'isotp'
+        port: 55000               # udp: CONFIG_CONSOLE_NETDEV_PORT, target address is learned
+        bind: '0.0.0.0'           # udp: (optional) host address to listen on
+        chunk: 128                # (optional) bytes per datagram (< CONFIG_CONSOLE_NETDEV_RXBUFSIZE)
+                                  # isotp keys: interface (can0), rx_id (target TX ID = PORT),
+                                  # tx_id (target RX ID, rx_id + 1), fd (CAN FD, false)
       dcmake:                     # (optional) Defines passed to CMake build
         DEFINE1: "VALUE1"
         DEFINE2: "VALUE2"

@@ -18,6 +18,7 @@
 #
 ############################################################################
 
+import socket
 from unittest.mock import MagicMock
 
 import pytest
@@ -289,3 +290,43 @@ def test_device_host_post_spawn_hook(envconfig_dummy, monkeypatch):
     assert order == ["post_spawn", "boot", "post_spawn", "boot"]
 
     dev.stop()
+
+
+def test_device_host_netconsole(envconfig_dummy, monkeypatch):
+    """The console runs over a UDP netdev console, not the child pty."""
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+
+    conf = envconfig_dummy.product[0].cfg_core(0)
+    conf._config["prompt"] = "nsh> "
+    conf._config["netconsole"] = {
+        "type": "udp",
+        "bind": "127.0.0.1",
+        "port": port,
+    }
+    target = "./tests/resources/netconsole/udp_target.py"
+    dev = DeviceHost2(conf)
+    dev._write = DeviceHost._write.__get__(dev)
+
+    # the transport is closed on stop even if the device never started
+    dev._netcon.start()
+    dev.stop()
+    assert dev._netcon.is_open is False
+
+    assert dev.host_open([f"python3 {target} {port}"]) is not None
+    assert dev._netcon.is_open is True
+    assert dev._dev_is_health_priv() is True
+
+    ret = dev.send_command(b"hello", 1)
+    assert b"Hello, World!" in ret
+    assert dev.send_ctrl_cmd("C") == 0
+
+    # a closed transport makes the device unhealthy
+    dev._netcon.stop()
+    assert dev._dev_is_health_priv() is False
+    dev._netcon.start()
+
+    dev.stop()
+    assert dev._netcon.is_open is False

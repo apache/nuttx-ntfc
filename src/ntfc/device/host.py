@@ -31,6 +31,7 @@ import psutil  # type: ignore
 from ntfc.log.logger import logger
 
 from .common import DeviceCommon
+from .netconsole import get_netconsole
 
 if TYPE_CHECKING:
     from ntfc.coreconfig import CoreConfig
@@ -55,6 +56,8 @@ class DeviceHost(DeviceCommon):
         self._child = None
         self._cwd = conf.exec_cwd
         self._cmd: Optional[List[str]] = None
+        # console over a network transport instead of the child pty
+        self._netcon = get_netconsole(conf.netconsole)
 
     @property
     def pid(self) -> Optional[int]:
@@ -81,6 +84,9 @@ class DeviceHost(DeviceCommon):
         if not self._child.isalive():
             return False
 
+        if self._netcon and not self._netcon.is_open:
+            return False
+
         return True
 
     def _dev_reopen(self) -> pexpect.spawn:
@@ -102,6 +108,10 @@ class DeviceHost(DeviceCommon):
         if data[-1] != ord("\n"):
             data += self.NEWLINE_PAD
 
+        if self._netcon:
+            self._netcon.write(data)
+            return
+
         if self._conf.line_buffered:
             self._child.send(data)
             return
@@ -116,6 +126,11 @@ class DeviceHost(DeviceCommon):
             return
 
         assert self._child
+
+        if self._netcon:
+            self._netcon.write(bytes([ord(c.upper()) & 0x1F]))
+            return
+
         self._child.sendcontrol(c)
 
     def _read(self) -> bytes:  # pragma: no cover
@@ -125,10 +140,18 @@ class DeviceHost(DeviceCommon):
 
         try:
             assert self._child
-            return self._child.read_nonblocking(size=5120, timeout=0)
+            data = self._child.read_nonblocking(size=5120, timeout=0)
 
         except (pexpect.TIMEOUT, pexpect.EOF):
-            return b""
+            data = b""
+
+        if self._netcon:
+            # the child pty is not the console: keep its output in the log
+            if data:
+                logger.debug(f"{self.name}: {data!r}")
+            return self._netcon.read()
+
+        return data
 
     def _kill_process_group(self, process: pexpect.spawn) -> None:
         """Kill process group."""
@@ -165,6 +188,10 @@ class DeviceHost(DeviceCommon):
         # we need command to reopen file in the case of crash
         self._cmd = cmd
 
+        if self._netcon:
+            # listen before the target boots, it sends its console at once
+            self._netcon.start()
+
         logger.info(f"spawn cmd: {''.join(cmd)}")
         child = pexpect.spawn(
             "".join(cmd), timeout=10, maxread=20000, cwd=self._cwd
@@ -199,6 +226,8 @@ class DeviceHost(DeviceCommon):
     def _stop_impl(self) -> None:
         """Stop host device and kill the underlying process."""
         if not self._child:
+            if self._netcon:
+                self._netcon.stop()
             return
 
         if self._child.isalive():  # pragma: no cover
@@ -211,6 +240,9 @@ class DeviceHost(DeviceCommon):
             self._kill_process_group(self._child)
 
         self._child = None
+
+        if self._netcon:
+            self._netcon.stop()
 
         logger.info("host device closed")
 
