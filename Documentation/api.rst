@@ -34,6 +34,8 @@ Device Interface
 
    ntfc.device.common
    ntfc.device.host
+   ntfc.device.netconsole
+   ntfc.device.netdev
    ntfc.device.nuttx
    ntfc.device.qemu
    ntfc.device.renode

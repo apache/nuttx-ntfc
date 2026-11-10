@@ -10,6 +10,8 @@
 - Refuse commands longer than the target CONFIG_LINE_MAX.
 - Reopen serial ports that disappear on target reset (USB re-enumeration).
 - Do not treat a target idle at its prompt as a busy loop.
+- Add the console over a NuttX netdev console (UDP or CAN ISO-TP) for sim, QEMU
+  and real hardware (``netdev`` device).
 
 ## 0.0.3
 

@@ -200,6 +200,16 @@ class CoreConfig:
         """Return whether commands are sent in one transport write."""
         return bool(self._config.get("line_buffered", False))
 
+    @property
+    def netconsole(self) -> Optional[Dict[str, Any]]:
+        """Return the netdev console section, or None to use the pty."""
+        cfg = self._config.get("netconsole", None)
+        if cfg is None:
+            return None
+        if not isinstance(cfg, dict):
+            raise TypeError("netconsole must be a mapping")
+        return cfg
+
     def kv_check(self, cfg: str) -> Any:
         """Check Kconfig option and return its value.
 
