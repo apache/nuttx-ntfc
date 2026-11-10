@@ -20,4 +20,4 @@
 
 
 def test_test_success():
-    assert 1
+    assert True

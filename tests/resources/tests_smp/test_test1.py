@@ -23,18 +23,18 @@ import pytest
 
 @pytest.mark.extra_opts("--run_in_cores=core0")
 def test_test_smp_1(core, switch_to_core):  # pragma: no cover
-    assert 1
+    assert True
 
 
 @pytest.mark.extra_opts("--run_in_cores=core0,core1")
 def test_test_smp_2(core, switch_to_core):  # pragma: no cover
-    assert 1
+    assert True
 
 
 @pytest.mark.extra_opts("--run_in_cores=core0,core1,core3")
 def test_test_smp_3(core, switch_to_core):  # pragma: no cover
-    assert 1
+    assert True
 
 
 def test_test_smp_4(core, switch_to_core):  # pragma: no cover
-    assert 1
+    assert True

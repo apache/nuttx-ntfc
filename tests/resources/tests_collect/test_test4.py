@@ -23,24 +23,24 @@ import pytest
 
 @pytest.mark.dep_config("CONFIG_EXAMPLES_HELLO")
 def test_test4_simple_1():  # pragma: no cover
-    assert 1
+    assert True
 
 
 @pytest.mark.dep_config("CONFIG_XXXXX")
 def test_test4_simple_2():  # pragma: no cover
-    assert 1
+    assert True
 
 
 @pytest.mark.cmd_check("hello_main")
 def test_test4_simple_3():  # pragma: no cover
-    assert 1
+    assert True
 
 
 @pytest.mark.cmd_check("xxxx_main")
 def test_test4_simple_4():  # pragma: no cover
-    assert 1
+    assert True
 
 
 @pytest.mark.extra_opts("xxxx")
 def test_test4_simple_5():  # pragma: no cover
-    assert 1
+    assert True

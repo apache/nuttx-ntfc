@@ -20,8 +20,8 @@
 
 
 def test_test1_simple_1():  # pragma: no cover
-    assert 1
+    assert True
 
 
 def test_test1_simple_2():  # pragma: no cover
-    assert 1
+    assert True

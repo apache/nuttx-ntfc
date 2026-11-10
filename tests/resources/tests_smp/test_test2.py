@@ -20,4 +20,4 @@
 
 
 def test_test_smp_4(core, switch_to_core):  # pragma: no cover
-    assert 1
+    assert True
