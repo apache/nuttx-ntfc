@@ -27,7 +27,7 @@ import logging
 import os
 import re
 import subprocess
-from typing import List, Pattern, Union
+from typing import Dict, List, Pattern, Set, Tuple, Union
 
 
 class Symbol:
@@ -42,6 +42,8 @@ class Symbol:
 
 class ElfParser:
     """ELF file parser for extracting symbols."""
+
+    _PREFIX_ANCHORS = {"nx_start", "main"}
 
     def __init__(self, elf_path: str):
         """Initialize ELF file parser."""
@@ -78,7 +80,7 @@ class ElfParser:
                 check=True,
             )
 
-            symbols = []
+            entries: List[Tuple[str, Dict[str, str]]] = []
             for line in result.stdout.splitlines():
                 line = line.strip()
                 if not line:
@@ -87,15 +89,20 @@ class ElfParser:
                 parts = line.split()
                 if len(parts) >= 3:
                     address, symbol_type, name = parts[0], parts[1], parts[2]
-                    symbols.append(Symbol(name, address, symbol_type))
-                elif len(parts) >= 2:  # pragma: no cover
+                    kwargs = {"address": address, "symbol_type": symbol_type}
+                    entries.append((name, kwargs))
+                elif len(parts) >= 2:
                     symbol_type, name = parts[0], parts[1]
-                    symbols.append(Symbol(name, symbol_type=symbol_type))
+                    entries.append((name, {"symbol_type": symbol_type}))
                 elif len(parts) == 1:  # pragma: no cover
                     name = parts[0]
-                    symbols.append(Symbol(name))
+                    entries.append((name, {}))
 
-            return symbols
+            prefix = self._label_prefix({name for name, _ in entries})
+            return [
+                Symbol(name.removeprefix(prefix), **kwargs)
+                for name, kwargs in entries
+            ]
 
         except subprocess.CalledProcessError as e:  # pragma: no cover
             logging.error(
@@ -106,6 +113,14 @@ class ElfParser:
         except Exception as e:  # pragma: no cover
             logging.error(f"Unexpected error parsing ELF symbols: {e}")
             return []
+
+    @classmethod
+    def _label_prefix(cls, names: Set[str]) -> str:
+        """Return "_" if the target prefixes C symbols, else ""."""
+        prefixed = {"_" + a for a in cls._PREFIX_ANCHORS}
+        if not names.isdisjoint(cls._PREFIX_ANCHORS):
+            return ""
+        return "_" if not names.isdisjoint(prefixed) else ""
 
     def get_symbols_by_pattern(
         self, prefix: str = "", suffix: str = ""
