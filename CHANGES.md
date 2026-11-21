@@ -14,6 +14,7 @@
 - Do not treat a target idle at its prompt as a busy loop.
 - Add the console over a NuttX netdev console (UDP or CAN ISO-TP) for sim, QEMU
   and real hardware (``netdev`` device).
+- Detect the "_" C symbol prefix of RH850 and RX images.
 
 ## 0.0.3
 

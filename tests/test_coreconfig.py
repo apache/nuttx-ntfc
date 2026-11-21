@@ -260,3 +260,23 @@ def test_core_config_prompt():
     p = CoreConfig(conf)
     # Should load from kv_config file or return None
     assert p.prompt == "nsh> "
+
+
+def test_core_config_cmd_check_label_prefix(mocker):
+    result = mocker.Mock()
+    result.stdout = "00000100 T _nx_start\n00000200 T _ostest_main\n"
+    mocker.patch("ntfc.lib.elf.elf_parser.subprocess.run", return_value=result)
+
+    conf = {
+        "name": "dummy",
+        "device": "qemu",
+        "elf_path": "./tests/resources/nuttx/sim/nuttx",
+        "conf_path": "./tests/resources/nuttx/sim/kv_config",
+    }
+
+    p = CoreConfig(conf)
+
+    assert p.cmd_check("ostest_main") is True
+    assert p.cmd_check("missing|ostest_main") is True
+    assert p.cmd_check("ostest.*") is True
+    assert p.cmd_check("_ostest_main") is False
