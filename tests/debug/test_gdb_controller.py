@@ -767,12 +767,20 @@ class TestGdbControllerCorefileLedger:
             ctrl = GdbController(elf, _cfg())
             w_file.write(b"(gdb) \n")
             ctrl.start(timeout=5.0)
-        w_file.write(f"Saved corefile {corefile}\n".encode())
-        w_file.write(f"{GdbController.GCORE_MARKER}\n".encode())
-        result = ctrl.generate_coredump(tmp_path, "pull", timeout=5.0)
+        _respond_on_gcore(
+            proc,
+            w_file,
+            (
+                f"Saved corefile {corefile}\n"
+                f"{GdbController.GCORE_MARKER}\n"
+            ).encode(),
+        )
+        try:
+            result = ctrl.generate_coredump(tmp_path, "pull", timeout=5.0)
+            later = ctrl.wait_corefile(timeout=0.05)
+        finally:
+            w_file.close()
+            ctrl.stop()
+            proc.stdout.close()
         assert result == corefile
-        later = ctrl.wait_corefile(timeout=0.05)
-        w_file.close()
-        ctrl.stop()
-        proc.stdout.close()
         assert later is None
