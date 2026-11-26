@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.0.4
+
 - Add Renode device support.
 - Fail the build when a Kconfig override is not applied.
 - Report a slow command as TIMEOUT instead of a flood.
